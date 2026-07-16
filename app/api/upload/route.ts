@@ -1,6 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { writeFile, mkdir } from "fs/promises";
-import path from "path";
+import { createClient } from "@supabase/supabase-js";
 
 export async function POST(req: NextRequest) {
   try {
@@ -11,30 +10,59 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: "No file uploaded" }, { status: 400 });
     }
 
+    // Initialize Supabase admin client with service role key
+    const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
+    const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
+
+    if (!supabaseUrl || !supabaseServiceKey) {
+      return NextResponse.json(
+        { error: "Supabase credentials not configured" },
+        { status: 500 }
+      );
+    }
+
+    const supabase = createClient(supabaseUrl, supabaseServiceKey);
+
     const bytes = await file.arrayBuffer();
     const buffer = Buffer.from(bytes);
 
-    // Save to public/uploads at project root
-    const uploadDir = path.join(process.cwd(), "public", "uploads");
-    await mkdir(uploadDir, { recursive: true });
-
+    // Determine file path and bucket
     const isHero = formData.get("isHero") === "true";
-    let filename = "";
+    let filePath = "";
+    const bucket = "product-images";
 
     if (isHero) {
-      filename = "hero_main.jpg";
+      filePath = "hero/hero_main.jpg";
     } else {
       // Generate clean unique filename
       const cleanName = file.name.replace(/[^a-zA-Z0-9.-]/g, "_");
-      filename = `${Date.now()}-${cleanName}`;
+      filePath = `products/${Date.now()}-${cleanName}`;
     }
 
-    const filePath = path.join(uploadDir, filename);
-    await writeFile(filePath, buffer);
+    // Upload to Supabase Storage
+    const { data, error } = await supabase.storage
+      .from(bucket)
+      .upload(filePath, buffer, {
+        contentType: file.type,
+        upsert: isHero, // Allow overwriting hero image
+      });
 
-    return NextResponse.json({ 
-      success: true, 
-      url: `/uploads/${filename}` 
+    if (error) {
+      console.error("Supabase upload error:", error);
+      return NextResponse.json(
+        { error: `Upload failed: ${error.message}` },
+        { status: 500 }
+      );
+    }
+
+    // Get public URL
+    const { data: publicData } = supabase.storage
+      .from(bucket)
+      .getPublicUrl(filePath);
+
+    return NextResponse.json({
+      success: true,
+      url: publicData.publicUrl,
     });
   } catch (error: any) {
     console.error("Upload error:", error);
