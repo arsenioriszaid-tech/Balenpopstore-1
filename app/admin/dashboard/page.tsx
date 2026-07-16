@@ -55,6 +55,7 @@ export default function AdminDashboardPage() {
   const [uploadingHero, setUploadingHero] = useState(false);
   const [heroUploadMessage, setHeroUploadMessage] = useState("");
   const [uploadingProduct, setUploadingProduct] = useState(false);
+  const [heroImage, setHeroImage] = useState("");
 
   // Modal / CRUD editing States
   const [activeProductModal, setActiveProductModal] = useState<"create" | "edit" | null>(null);
@@ -200,6 +201,7 @@ export default function AdminDashboardPage() {
 
       const data = await res.json();
       if (data.success) {
+        setHeroImage(data.url);
         setHeroUploadMessage("Berhasil! Foto utama halaman depan telah diperbarui secara instan.");
       } else {
         setHeroUploadMessage("Gagal mengunggah gambar: " + (data.error || "Terjadi kesalahan"));
@@ -259,7 +261,7 @@ export default function AdminDashboardPage() {
       category_id: categories[0]?.id || "",
       description: "",
       price: "",
-      image_url: `https://picsum.photos/seed/${Math.random().toString(36).substring(7)}/600/600`,
+      image_url: "",
       is_active: true,
     });
     setActiveProductModal("create");
@@ -345,6 +347,325 @@ export default function AdminDashboardPage() {
         await supabase.from("categories").insert(payload);
       } else {
         await supabase.from("categories").update(payload).eq("id", categoryForm.id);
+      }
+
+      await loadAllData();
+      setActiveCategoryModal(null);
+    } catch (err) {
+      console.error("Failed to commit category:", err);
+    } finally {
+      setFormLoading(false);
+    }
+  };
+
+  const handleDeleteCategory = async (catId: string) => {
+    if (!confirm("Apakah Anda yakin ingin menghapus kategori ini secara permanen?")) return;
+    setIsRefreshing(true);
+    try {
+      await supabase.from("categories").delete().eq("id", catId);
+      await loadAllData();
+    } catch (err) {
+      console.error("Delete failed:", err);
+    } finally {
+      setIsRefreshing(false);
+    }
+  };
+
+  // ----------------------------------------------------------------
+  // VARIANT CRUD PROCEDURES
+  // ----------------------------------------------------------------
+  const triggerManageVariants = (p: any) => {
+    setVariantForm({
+      id: "",
+      product_id: p.id,
+      size_label: "",
+      price_override: "",
+      stock: "10",
+      is_active: true,
+    });
+    setActiveVariantModal("manage");
+  };
+
+  const handleAddVariantSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setFormLoading(true);
+
+    try {
+      const override = variantForm.price_override.trim() !== "" ? Number(variantForm.price_override) : null;
+      const payload = {
+        product_id: variantForm.product_id,
+        size_label: variantForm.size_label,
+        price_override: override,
+        stock: Number(variantForm.stock),
+        is_active: variantForm.is_active,
+      };
+
+      await supabase.from("product_variants").insert(payload);
+      await loadAllData();
+      // Reset form fields
+      setVariantForm((prev) => ({
+        ...prev,
+        id: "",
+        size_label: "",
+        price_override: "",
+        stock: "10",
+      }));
+    } catch (err) {
+      console.error("Failed to add variant:", err);
+    } finally {
+      setFormLoading(false);
+    }
+  };
+
+  const handleDeleteVariant = async (varId: string) => {
+    if (!confirm("Hapus varian ukuran ini?")) return;
+    setFormLoading(true);
+    try {
+      await supabase.from("product_variants").delete().eq("id", varId);
+      await loadAllData();
+    } catch (err) {
+      console.error(err);
+    } finally {
+      setFormLoading(false);
+    }
+  };
+
+  // ----------------------------------------------------------------
+  // MULTI IMAGE CRUD PROCEDURES
+  // ----------------------------------------------------------------
+  const triggerManageImages = (p: any) => {
+    setExtraImageForm({
+      id: "",
+      product_id: p.id,
+      image_url: "",
+      sort_order: "0",
+    });
+    setActiveImageModal("manage");
+  };
+
+  const handleAddImageSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setFormLoading(true);
+
+    try {
+      const payload = {
+        product_id: extraImageForm.product_id,
+        image_url: extraImageForm.image_url,
+        sort_order: Number(extraImageForm.sort_order),
+      };
+
+      await supabase.from("product_images").insert(payload);
+      await loadAllData();
+      setExtraImageForm((prev) => ({
+        ...prev,
+        id: "",
+        image_url: "",
+        sort_order: "0",
+      }));
+    } catch (err) {
+      console.error(err);
+    } finally {
+      setFormLoading(false);
+    }
+  };
+
+  const handleDeleteImage = async (imgId: string) => {
+    if (!confirm("Hapus gambar tambahan ini?")) return;
+    setFormLoading(true);
+    try {
+      await supabase.from("product_images").delete().eq("id", imgId);
+      await loadAllData();
+    } catch (err) {
+      console.error(err);
+    } finally {
+      setFormLoading(false);
+    }
+  };
+
+  // ----------------------------------------------------------------
+  // MANUAL SALES INPUT & SEEDING PROCEDURES
+  // ----------------------------------------------------------------
+  const triggerAddSales = () => {
+    // Default pick
+    const firstProd = products[0];
+    const relatedVars = variants.filter((v) => v.product_id === firstProd?.id);
+
+    setSalesForm({
+      customer_name: "",
+      customer_phone: "",
+      customer_address: "",
+      status: "completed",
+      items: [],
+    });
+
+    setTempLineItem({
+      product_id: firstProd?.id || "",
+      variant_id: relatedVars[0]?.id || "base",
+      quantity: 1,
+    });
+
+    setActiveSaleModal("create");
+  };
+
+  // Calculate current price of temp pick
+  const getTempLinePrice = () => {
+    const p = products.find((prod) => prod.id === tempLineItem.product_id);
+    if (!p) return 0;
+    if (tempLineItem.variant_id !== "base") {
+      const v = variants.find((varRow) => varRow.id === tempLineItem.variant_id);
+      if (v && v.price_override !== null) {
+        return Number(v.price_override);
+      }
+    }
+    return Number(p.price);
+  };
+
+  const handleAddLineItem = () => {
+    if (!tempLineItem.product_id) return;
+    
+    const price = getTempLinePrice();
+    setSalesForm((prev) => ({
+      ...prev,
+      items: [
+        ...prev.items,
+        {
+          product_id: tempLineItem.product_id,
+          variant_id: tempLineItem.variant_id === "base" ? "" : tempLineItem.variant_id,
+          quantity: tempLineItem.quantity,
+          price_at_sale: price,
+        }
+      ]
+    }));
+  };
+
+  const handleRemoveLineItem = (idx: number) => {
+    setSalesForm((prev) => ({
+      ...prev,
+      items: prev.items.filter((_, i) => i !== idx),
+    }));
+  };
+
+  const handleSalesSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (salesForm.items.length === 0) {
+      alert("Harap tambahkan minimal 1 baris item produk!");
+      return;
+    }
+    setFormLoading(true);
+
+    try {
+      const totalAmount = salesForm.items.reduce((sum, item) => sum + item.price_at_sale * item.quantity, 0);
+
+      // 1. Insert Sales
+      const { data: salesData, error: salesErr } = await supabase
+        .from("sales")
+        .insert({
+          customer_name: salesForm.customer_name,
+          customer_phone: salesForm.customer_phone || null,
+          customer_address: salesForm.customer_address || null,
+          status: salesForm.status,
+          total_amount: totalAmount,
+        });
+
+      if (salesErr) throw salesErr;
+
+      const newSale = Array.isArray(salesData) && (salesData as any[]).length > 0 ? (salesData as any[])[0] : null;
+      const saleId = newSale ? newSale.id : `sale-${Math.random().toString(36).substring(7)}`;
+
+      // 2. Insert Sale Items
+      const preparedLines = salesForm.items.map((item) => ({
+        sale_id: saleId,
+        product_id: item.product_id,
+        variant_id: item.variant_id || null,
+        quantity: item.quantity,
+        price_at_sale: item.price_at_sale,
+      }));
+
+      await supabase.from("sale_items").insert(preparedLines);
+      await loadAllData();
+      setActiveSaleModal(null);
+    } catch (err) {
+      console.error("Failed to commit sale manually:", err);
+    } finally {
+      setFormLoading(false);
+    }
+  };
+
+  const handleViewSale = (saleRow: any) => {
+    // Collect related items
+    const lines = saleItems.filter((si) => si.sale_id === saleRow.id);
+    setSelectedSaleDetail({
+      ...saleRow,
+      lines: lines.map((l) => {
+        const prod = products.find((p) => p.id === l.product_id);
+        const vari = variants.find((v) => v.id === l.variant_id);
+        return {
+          ...l,
+          product_name: prod ? prod.name : "Produk Dihapus",
+          variant_label: vari ? vari.size_label : "",
+        };
+      }),
+    });
+    setActiveSaleModal("view");
+  };
+
+  // ----------------------------------------------------------------
+  // REPORTS COMPUTATIONS & EXPORTS
+  // ----------------------------------------------------------------
+  const totalSalesVolume = sales.reduce((sum, s) => sum + Number(s.total_amount), 0);
+  const totalCompletedOrders = sales.filter((s) => s.status === "completed").length;
+
+  // Group sales for daily, monthly summaries
+  const getReportsData = () => {
+    const dailyMap = new Map<string, number>();
+    const monthlyMap = new Map<string, number>();
+
+    sales.forEach((s) => {
+      const dateStr = new Date(s.created_at).toISOString().split("T")[0]; // YYYY-MM-DD
+      const monthStr = dateStr.substring(0, 7); // YYYY-MM
+
+      dailyMap.set(dateStr, (dailyMap.get(dateStr) || 0) + Number(s.total_amount));
+      monthlyMap.set(monthStr, (monthlyMap.get(monthStr) || 0) + Number(s.total_amount));
+    });
+
+    const daily = Array.from(dailyMap.entries()).map(([date, val]) => ({ key: date, val }));
+    const monthly = Array.from(monthlyMap.entries()).map(([month, val]) => ({ key: month, val }));
+
+    daily.sort((a, b) => b.key.localeCompare(a.key));
+    monthly.sort((a, b) => b.key.localeCompare(a.key));
+
+    return { daily, monthly };
+  };
+
+  const { daily: dailyReports, monthly: monthlyReports } = getReportsData();
+
+  // Excel/CSV Exporter (PRD §10.6/§14)
+  const handleExportCSV = () => {
+    let csvContent = "data:text/csv;charset=utf-8,";
+    csvContent += "ID Transaksi,Tanggal,Nama Pembeli,No WhatsApp,Alamat Kirim,Total Transaksi,Status\n";
+
+    sales.forEach((s) => {
+      const cleanDate = new Date(s.created_at).toLocaleString("id-ID");
+      const cleanAddress = (s.customer_address || "").replace(/,/g, " ");
+      const row = `"${s.id}","${cleanDate}","${s.customer_name}","${s.customer_phone || "-"}","${cleanAddress}",${s.total_amount},"${s.status}"`;
+      csvContent += row + "\n";
+    });
+
+    const encodedUri = encodeURI(csvContent);
+    const link = document.createElement("a");
+    link.setAttribute("href", encodedUri);
+    link.setAttribute("download", `Laporan_Penjualan_Balenpop_${new Date().toISOString().split("T")[0]}.csv`);
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+  };
+
+  if (isLoading) {
+    return (
+      <div className="min-h-screen bg-surface flex items-center justify-center">
+        <div className="text-center space-y-3">
+          <Loader2 className="h-10 w-10 text-primary animate-spin mx-auto" />
+          <p className="tegories").update(payload).eq("id", categoryForm.id);
       }
 
       await loadAllData();
