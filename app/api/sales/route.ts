@@ -30,7 +30,7 @@ export async function POST(req: NextRequest) {
     }
 
     // Capture the newly created sale ID
-    const insertedSale = saleData && saleData.length > 0 ? saleData[0] : null;
+    const insertedSale = Array.isArray(saleData) && (saleData as any[]).length > 0 ? (saleData as any[])[0] : null;
     const saleId = insertedSale ? insertedSale.id : `sale-${Math.random().toString(36).substring(7)}`;
 
     // Prepare sale items list
