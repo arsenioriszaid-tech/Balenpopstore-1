@@ -8,7 +8,7 @@ import { Lock, Mail, CheckCircle, Sparkles, AlertCircle } from "lucide-react";
 
 export default function AdminLoginPage() {
   const router = useRouter();
-  
+
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState<string | null>(null);
@@ -55,7 +55,7 @@ export default function AdminLoginPage() {
 
   return (
     <div className="min-h-screen bg-surface flex flex-col items-center justify-center p-4">
-      
+
       {/* Decorative Brand Header */}
       <div className="mb-6 text-center space-y-1.5">
         <span className="bg-primary text-white p-2.5 rounded font-mono font-bold tracking-wider text-sm shadow-md inline-block">
@@ -80,7 +80,7 @@ export default function AdminLoginPage() {
 
         {error && (
           <div className="p-3 bg-red-50 border border-red-200 text-red-700 rounded-lg flex items-start gap-2.5 text-xs mb-5">
-            <AlertCircle className="h-4.5 w-4.5 text-red-500 flex-shrink-0 mt-0.5" />
+            <AlertCircle className="h-4 w-4 text-red-500 flex-shrink-0 mt-0.5" />
             <span>{error}</span>
           </div>
         )}
@@ -98,7 +98,7 @@ export default function AdminLoginPage() {
               value={email}
               onChange={(e) => setEmail(e.target.value)}
               placeholder="admin@balenpopstore.com"
-              className="w-full px-3.5 py-2.5 bg-white border border-border-strong rounded-md text-sm text-primary placeholder:text-text-muted focus:border-primary focus:ring-3 focus:ring-primary/10 outline-none transition-all"
+              className="w-full px-3.5 py-2.5 bg-white border border-border-strong rounded-md text-sm text-primary placeholder:text-text-muted focus:border-primary focus:ring-2 focus:ring-primary/10 outline-none transition-all"
             />
           </div>
 
@@ -114,14 +114,14 @@ export default function AdminLoginPage() {
               value={password}
               onChange={(e) => setPassword(e.target.value)}
               placeholder="Masukkan password admin"
-              className="w-full px-3.5 py-2.5 bg-white border border-border-strong rounded-md text-sm text-primary placeholder:text-text-muted focus:border-primary focus:ring-3 focus:ring-primary/10 outline-none transition-all"
+              className="w-full px-3.5 py-2.5 bg-white border border-border-strong rounded-md text-sm text-primary placeholder:text-text-muted focus:border-primary focus:ring-2 focus:ring-primary/10 outline-none transition-all"
             />
           </div>
 
           <button
             type="submit"
             disabled={isLoading}
-          <span className="w-full py-3 bg-primary hover:bg-primary-hover disabled:bg-primary/65 text-white text-xs font-bold rounded-lg flex items-center justify-center gap-2 transition-colors cursor-pointer uppercase tracking-wider mt-2"
+            className="w-full py-3 bg-primary hover:bg-primary-hover disabled:bg-primary/65 text-white text-xs font-bold rounded-lg flex items-center justify-center gap-2 transition-colors cursor-pointer uppercase tracking-wider mt-2"
           >
             {isLoading ? (
               <span className="inline-block h-4 w-4 animate-spin rounded-full border-2 border-white border-t-transparent" />
@@ -130,7 +130,7 @@ export default function AdminLoginPage() {
             )}
           </button>
         </form>
-
+      </div>
 
       {/* Footer link to storefront */}
       <div className="mt-8 text-center">
