@@ -126,8 +126,8 @@ export default function HomePage() {
                 <img
                   src={heroImage}
                   onError={() => {
-                    if (heroImage !== "https://picsum.photos/seed/klakatpremium/600/600") {
-                      setHeroImage("https://picsum.photos/seed/klakatpremium/600/600");
+                    if (heroImage !== "https://ixuicwskzakgelmhcfsh.supabase.co/storage/v1/object/public/product-images/hero/hero_main.jpg") {
+                      setHeroImage("https://ixuicwskzakgelmhcfsh.supabase.co/storage/v1/object/public/product-images/hero/hero_main.jpg");
                     }
                   }}
                   alt="Klakat Kukusan Stainless BalenpopStore"
