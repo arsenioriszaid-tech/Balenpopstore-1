@@ -4,7 +4,7 @@ import React, { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { supabase } from "@/lib/supabase/client";
-import { Lock, Mail, CheckCircle, Sparkles, AlertCircle } from "lucide-react";
+import { Lock, Mail, AlertCircle } from "lucide-react";
 
 export default function AdminLoginPage() {
   const router = useRouter();
@@ -17,9 +17,13 @@ export default function AdminLoginPage() {
   // Check if already logged in on mount
   useEffect(() => {
     async function checkUser() {
-      const { data } = await supabase.auth.getUser();
-      if (data?.user) {
-        router.push("/admin/dashboard");
+      try {
+        const { data } = await supabase.auth.getUser();
+        if (data?.user) {
+          router.push("/admin/dashboard");
+        }
+      } catch (err: unknown) {
+        console.error("Error checking user:", err);
       }
     }
     checkUser();
@@ -39,15 +43,18 @@ export default function AdminLoginPage() {
       if (authError) {
         setError(authError.message);
       } else if (data?.user) {
-        if (typeof window !== "undefined") {
-          // SameSite=None; Secure is required for cookies to work inside cross-site iframes
-          document.cookie = "balenpop_admin_logged_in=true; path=/; max-age=86400; SameSite=None; Secure";
-          localStorage.setItem("balenpop_admin_logged_in", "true");
+        // Supabase handles session automatically
+        // No need for manual cookie/localStorage manipulation
+        try {
+          router.push("/admin/dashboard");
+        } catch (navErr: unknown) {
+          console.error("Navigation error:", navErr);
+          setError("Gagal menavigasi ke dashboard");
         }
-        router.push("/admin/dashboard");
       }
-    } catch (err: any) {
+    } catch (err: unknown) {
       setError("Terjadi kesalahan jaringan atau server.");
+      console.error("Login error:", err);
     } finally {
       setIsLoading(false);
     }
@@ -95,10 +102,11 @@ export default function AdminLoginPage() {
             <input
               type="email"
               required
+              disabled={isLoading}
               value={email}
               onChange={(e) => setEmail(e.target.value)}
               placeholder="admin@balenpopstore.com"
-              className="w-full px-3.5 py-2.5 bg-white border border-border-strong rounded-md text-sm text-primary placeholder:text-text-muted focus:border-primary focus:ring-2 focus:ring-primary/10 outline-none transition-all"
+              className="w-full px-3.5 py-2.5 bg-white border border-border-strong rounded-md text-sm text-primary placeholder:text-text-muted focus:border-primary focus:ring-2 focus:ring-primary/10 outline-none transition-all disabled:bg-gray-100 disabled:cursor-not-allowed"
             />
           </div>
 
@@ -111,17 +119,18 @@ export default function AdminLoginPage() {
             <input
               type="password"
               required
+              disabled={isLoading}
               value={password}
               onChange={(e) => setPassword(e.target.value)}
               placeholder="Masukkan password admin"
-              className="w-full px-3.5 py-2.5 bg-white border border-border-strong rounded-md text-sm text-primary placeholder:text-text-muted focus:border-primary focus:ring-2 focus:ring-primary/10 outline-none transition-all"
+              className="w-full px-3.5 py-2.5 bg-white border border-border-strong rounded-md text-sm text-primary placeholder:text-text-muted focus:border-primary focus:ring-2 focus:ring-primary/10 outline-none transition-all disabled:bg-gray-100 disabled:cursor-not-allowed"
             />
           </div>
 
           <button
             type="submit"
             disabled={isLoading}
-            className="w-full py-3 bg-primary hover:bg-primary-hover disabled:bg-primary/65 text-white text-xs font-bold rounded-lg flex items-center justify-center gap-2 transition-colors cursor-pointer uppercase tracking-wider mt-2"
+            className="w-full py-3 bg-primary hover:bg-primary-hover disabled:bg-primary/65 text-white text-xs font-bold rounded-lg flex items-center justify-center gap-2 transition-colors cursor-pointer"
           >
             {isLoading ? (
               <span className="inline-block h-4 w-4 animate-spin rounded-full border-2 border-white border-t-transparent" />
