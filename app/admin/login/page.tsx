@@ -121,7 +121,7 @@ export default function AdminLoginPage() {
           <button
             type="submit"
             disabled={isLoading}
-            className="w-full py-3 bg-primary hover:bg-primary-hover disabled:bg-primary/65 text-white text-xs font-bold rounded-lg flex items-center justify-center gap-2 transition-colors cursor-pointer uppercase tracking-wider mt-2"
+          <span className="w-full py-3 bg-primary hover:bg-primary-hover disabled:bg-primary/65 text-white text-xs font-bold rounded-lg flex items-center justify-center gap-2 transition-colors cursor-pointer uppercase tracking-wider mt-2"
           >
             {isLoading ? (
               <span className="inline-block h-4 w-4 animate-spin rounded-full border-2 border-white border-t-transparent" />
