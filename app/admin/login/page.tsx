@@ -43,8 +43,10 @@ export default function AdminLoginPage() {
       if (authError) {
         setError(authError.message);
       } else if (data?.user) {
-        // Supabase handles session automatically
-        // No need for manual cookie/localStorage manipulation
+        // Set flag cookie agar middleware bisa mendeteksi status login
+        if (typeof window !== "undefined") {
+          document.cookie = "balenpop_admin_logged_in=true; path=/; max-age=86400; SameSite=Lax";
+        }
         try {
           router.push("/admin/dashboard");
         } catch (navErr: unknown) {
