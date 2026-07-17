@@ -131,16 +131,6 @@ export default function AdminLoginPage() {
           </button>
         </form>
 
-        {/* Demo credentials notification */}
-        <div className="mt-6 pt-5 border-t border-border-custom bg-surface/30 p-3.5 rounded-lg text-left text-[11px] text-text-secondary space-y-1">
-          <div className="font-bold text-primary flex items-center gap-1.5 mb-1 text-xs">
-            <Sparkles className="h-3.5 w-3.5 text-accent animate-pulse" />
-            Akses Demo Sandbox AI Studio
-          </div>
-          <p>Email: <span className="font-mono font-bold text-primary">admin@balenpopstore.com</span></p>
-          <p>Password: <span className="font-mono font-bold text-primary">admin123</span></p>
-        </div>
-      </div>
 
       {/* Footer link to storefront */}
       <div className="mt-8 text-center">
