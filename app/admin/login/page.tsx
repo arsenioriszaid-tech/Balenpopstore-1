@@ -94,6 +94,129 @@ export default function AdminLoginPage() {
           </div>
         )}
 
+"use client";
+
+import React, { useState, useEffect } from "react";
+import { useRouter } from "next/navigation";
+import Link from "next/link";
+import { supabase } from "@/lib/supabase/client";
+import { Lock, Mail, AlertCircle } from "lucide-react";
+
+export default function AdminLoginPage() {
+  const router = useRouter();
+
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
+  const [error, setError] = useState<string | null>(null);
+  const [isLoading, setIsLoading] = useState(false);
+  const [debugInfo, setDebugInfo] = useState<string | null>(null); // TEMP: hapus setelah debugging selesai
+
+  // Check if already logged in on mount
+  useEffect(() => {
+    async function checkUser() {
+      try {
+        const { data } = await supabase.auth.getUser();
+        if (data?.user) {
+          router.push("/admin/dashboard");
+        }
+      } catch (err: unknown) {
+        console.error("Error checking user:", err);
+      }
+    }
+    checkUser();
+  }, [router]);
+
+  const handleLoginSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setError(null);
+    setDebugInfo(null); // TEMP
+    setIsLoading(true);
+
+    try {
+      const { data, error: authError } = await supabase.auth.signInWithPassword({
+        email,
+        password,
+      });
+
+      // TEMP: tampilkan mentahan respons di layar untuk debugging
+      setDebugInfo(
+        JSON.stringify(
+          {
+            hasError: !!authError,
+            errorMessage: authError?.message,
+            hasUser: !!data?.user,
+            hasSession: !!data?.session,
+            userId: data?.user?.id,
+          },
+          null,
+          2
+        )
+      );
+
+      if (authError) {
+        setError(authError.message);
+      } else if (data?.user) {
+        // Set flag cookie agar middleware bisa mendeteksi status login
+        if (typeof window !== "undefined") {
+          document.cookie = "balenpop_admin_logged_in=true; path=/; max-age=86400; SameSite=Lax";
+        }
+        try {
+          router.push("/admin/dashboard");
+        } catch (navErr: unknown) {
+          console.error("Navigation error:", navErr);
+          setError("Gagal menavigasi ke dashboard");
+        }
+      } else {
+        // TEMP: kondisi ganjil - tidak ada error, tapi tidak ada user juga
+        setError("Login tidak mengembalikan user maupun error. Cek debug info di bawah.");
+      }
+    } catch (err: unknown) {
+      setError("Terjadi kesalahan jaringan atau server.");
+      console.error("Login error:", err);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  return (
+    <div className="min-h-screen bg-surface flex flex-col items-center justify-center p-4">
+
+      {/* Decorative Brand Header */}
+      <div className="mb-6 text-center space-y-1.5">
+        <span className="bg-primary text-white p-2.5 rounded font-mono font-bold tracking-wider text-sm shadow-md inline-block">
+          BP
+        </span>
+        <h2 className="font-sans text-xl font-black text-primary leading-none">
+          Balenpop<span className="text-accent">Store</span>
+        </h2>
+        <p className="text-[10px] text-text-secondary uppercase tracking-widest font-mono">
+          Portal Administrasi Toko
+        </p>
+      </div>
+
+      {/* Login Card */}
+      <div className="w-full max-w-md bg-white border border-border-custom rounded-xl p-6 sm:p-8 shadow-md">
+        <div className="mb-6 space-y-1.5">
+          <h1 className="font-sans text-lg font-bold text-primary">Login Administrator</h1>
+          <p className="text-text-secondary text-xs">
+            Masukkan alamat email administrator untuk mengelola katalog produk, kategori, dan laporan transaksi manual.
+          </p>
+        </div>
+
+        {error && (
+          <div className="p-3 bg-red-50 border border-red-200 text-red-700 rounded-lg flex items-start gap-2.5 text-xs mb-5">
+            <AlertCircle className="h-4 w-4 text-red-500 flex-shrink-0 mt-0.5" />
+            <span>{error}</span>
+          </div>
+        )}
+
+        {/* TEMP: hapus blok ini setelah masalah login selesai di-debug */}
+        {debugInfo && (
+          <pre className="p-3 bg-yellow-50 border border-yellow-200 text-yellow-800 rounded-lg text-[10px] mb-5 overflow-x-auto whitespace-pre-wrap">
+            {debugInfo}
+          </pre>
+        )}
+
         <form onSubmit={handleLoginSubmit} className="space-y-4">
           {/* Email input */}
           <div>
