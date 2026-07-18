@@ -55,7 +55,7 @@ export default function Footer() {
                 <h5 className="text-sm font-semibold tracking-wide text-white">
                   {badge.title}
                 </h5>
-                <p className="mt-1 text-xs leading-relaxed text-white/50">
+                <p className="mt-1 text-xs leading-relaxed text-white/70">
                   {badge.desc}
                 </p>
               </div>
@@ -76,7 +76,7 @@ export default function Footer() {
                 Balenpop<span className="text-accent">Store</span>
               </span>
             </div>
-            <p className="text-white/50 text-xs leading-relaxed max-w-xs">
+            <p className="text-white/70 text-xs leading-relaxed max-w-xs">
               Produsen dan distributor tangan pertama produk dapur stainless premium. Spesialis klakat kukusan kotak dan bulat food-grade SUS 304 dengan ketebalan prima.
             </p>
             <div className="flex flex-col gap-2 pt-2 text-xs text-white/70">
@@ -97,21 +97,21 @@ export default function Footer() {
               <span className="h-1.5 w-1.5 bg-accent rounded-full" />
               Navigasi Cepat
             </h4>
-            <ul className="space-y-2.5 text-xs text-white/50">
+            <ul className="space-y-2.5 text-xs text-white/70">
               <li>
-                <Link href="/" className="hover:text-white transition-colors">Beranda Utama</Link>
+                <Link href="/" className="inline-block py-1 hover:text-white transition-colors">Beranda Utama</Link>
               </li>
               <li>
-                <Link href="/catalog" className="hover:text-white transition-colors">Katalog Klakat</Link>
+                <Link href="/catalog" className="inline-block py-1 hover:text-white transition-colors">Katalog Klakat</Link>
               </li>
               <li>
-                <Link href="/about" className="hover:text-white transition-colors">Tentang Balenpop</Link>
+                <Link href="/about" className="inline-block py-1 hover:text-white transition-colors">Tentang Balenpop</Link>
               </li>
               <li>
-                <Link href="/faq" className="hover:text-white transition-colors">Tanya & Jawab (FAQ)</Link>
+                <Link href="/faq" className="inline-block py-1 hover:text-white transition-colors">Tanya & Jawab (FAQ)</Link>
               </li>
               <li>
-                <Link href="/contact" className="hover:text-white transition-colors">Hubungi Penjual</Link>
+                <Link href="/contact" className="inline-block py-1 hover:text-white transition-colors">Hubungi Penjual</Link>
               </li>
             </ul>
           </div>
@@ -122,7 +122,7 @@ export default function Footer() {
               <span className="h-1.5 w-1.5 bg-accent rounded-full" />
               Keunggulan Kami
             </h4>
-            <ul className="space-y-3 text-xs text-white/50">
+            <ul className="space-y-3 text-xs text-white/70">
               <li className="flex gap-2.5">
                 <ShieldCheck className="h-4 w-4 text-accent flex-shrink-0" />
                 <span>Bahan Stainless SUS 304 Tebal, Food Grade & Anti Karat</span>
@@ -144,11 +144,11 @@ export default function Footer() {
               <span className="h-1.5 w-1.5 bg-accent rounded-full" />
               Jam Operasional
             </h4>
-            <div className="text-xs text-white/50 space-y-2">
+            <div className="text-xs text-white/70 space-y-2">
               <p>Senin - Sabtu: <span className="text-white">08:00 - 18:00 WIB</span></p>
               <p>Minggu / Hari Libur: <span className="text-white">Chat Tetap Dilayani (Slow Response)</span></p>
               <div className="pt-4 border-t border-white/5 mt-4">
-                <p className="text-[11px] text-white/40">Menerima pemesanan satuan, partai besar, kustomisasi ukuran industri kuliner.</p>
+                <p className="text-[11px] text-white/60">Menerima pemesanan satuan, partai besar, kustomisasi ukuran industri kuliner.</p>
               </div>
             </div>
           </div>
@@ -156,31 +156,38 @@ export default function Footer() {
         </div>
 
         {/* Bottom Credits & Legalities */}
-        <div className="pt-10 flex flex-col sm:flex-row items-center justify-between gap-4 text-xs text-white/40">
+        <div className="pt-10 flex flex-col sm:flex-row items-center justify-between gap-4 text-xs text-white/60">
           <div>
             BalenpopStore © {currentYear}. Hak Cipta Dilindungi.
           </div>
-          <div className="flex gap-6">
-            <Link href="/admin/login" className="hover:text-white transition-colors font-mono text-[10px]">Portal Admin</Link>
+          <div className="flex items-center gap-6">
+            <Link href="/admin/login" className="inline-block py-1.5 hover:text-white transition-colors font-mono text-[10px]">Portal Admin</Link>
             <span className="text-white/20">|</span>
-            <span className="text-white/40">Klakat Premium Indonesia</span>
+            <span className="text-white/60">Klakat Premium Indonesia</span>
           </div>
         </div>
 
       </div>
 
       <style jsx>{`
-        @keyframes float-slow {
-          0%,
-          100% {
-            transform: translateY(0px);
+        @media (prefers-reduced-motion: no-preference) {
+          @keyframes float-slow {
+            0%,
+            100% {
+              transform: translateY(0px);
+            }
+            50% {
+              transform: translateY(-8px);
+            }
           }
-          50% {
-            transform: translateY(-8px);
+          .animate-float-slow {
+            animation: float-slow 4.5s ease-in-out infinite;
           }
         }
-        .animate-float-slow {
-          animation: float-slow 4.5s ease-in-out infinite;
+        @media (prefers-reduced-motion: reduce) {
+          .animate-float-slow {
+            animation: none;
+          }
         }
       `}</style>
     </footer>
