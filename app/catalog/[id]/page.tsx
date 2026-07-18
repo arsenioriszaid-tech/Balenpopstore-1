@@ -5,7 +5,7 @@ import Header from "@/components/storefront/Header";
 import Footer from "@/components/storefront/Footer";
 import { supabase } from "@/lib/supabase/client";
 import { useCart } from "@/hooks/use-cart";
-import { motion, AnimatePresence } from "motion/react";
+import { motion, AnimatePresence, useReducedMotion } from "motion/react";
 import { 
   ShoppingBag, 
   Check, 
@@ -15,7 +15,9 @@ import {
   Sparkles,
   Info,
   Calendar,
-  Tag
+  Tag,
+  X,
+  ZoomIn
 } from "lucide-react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
@@ -28,6 +30,7 @@ export default function ProductDetailPage({
   const router = useRouter();
   const { id } = React.use(params);
   const { addToCart } = useCart();
+  const shouldReduceMotion = useReducedMotion();
 
   const [product, setProduct] = useState<any>(null);
   const [category, setCategory] = useState<any>(null);
@@ -41,10 +44,14 @@ export default function ProductDetailPage({
   const [isLoading, setIsLoading] = useState(true);
   const [isAdded, setIsAdded] = useState(false);
 
-  // Image zoom-on-hover state
+  // Image zoom-on-hover state (desktop)
   const [isZooming, setIsZooming] = useState(false);
   const [zoomOrigin, setZoomOrigin] = useState({ x: 50, y: 50 });
   const imageWrapRef = useRef<HTMLDivElement>(null);
+
+  // Fullscreen lightbox state (mobile-friendly image inspection)
+  const [isLightboxOpen, setIsLightboxOpen] = useState(false);
+  const lightboxCloseButtonRef = useRef<HTMLButtonElement>(null);
 
   const handleImageMouseMove = (e: React.MouseEvent<HTMLDivElement>) => {
     const rect = imageWrapRef.current?.getBoundingClientRect();
@@ -161,6 +168,46 @@ export default function ProductDetailPage({
     window.open(waUrl, "_blank");
   };
 
+  // All image gallery options (Main image + Extra images).
+  // Computed before the early returns (guarded against a null product) so it can be
+  // reused both by the JSX gallery and by the lightbox keyboard navigation effect below.
+  const allImages = product
+    ? [product.image_url, ...extraImages.map((img) => img.image_url)].filter(Boolean)
+    : [];
+
+  // Keyboard support for the fullscreen lightbox: Escape closes it, Left/Right arrows
+  // step through allImages using the existing selectedImage state.
+  useEffect(() => {
+    if (!isLightboxOpen) return;
+
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === "Escape") {
+        setIsLightboxOpen(false);
+        return;
+      }
+      if (allImages.length < 2) return;
+      const currentIndex = allImages.indexOf(selectedImage);
+      if (currentIndex === -1) return;
+      if (e.key === "ArrowRight") {
+        setSelectedImage(allImages[(currentIndex + 1) % allImages.length]);
+      } else if (e.key === "ArrowLeft") {
+        setSelectedImage(allImages[(currentIndex - 1 + allImages.length) % allImages.length]);
+      }
+    };
+
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, [isLightboxOpen, allImages, selectedImage]);
+
+  // Focus the close button whenever the lightbox opens, for basic focus management.
+  useEffect(() => {
+    if (!isLightboxOpen) return;
+    const focusTimeout = window.setTimeout(() => {
+      lightboxCloseButtonRef.current?.focus();
+    }, 50);
+    return () => window.clearTimeout(focusTimeout);
+  }, [isLightboxOpen]);
+
   if (isLoading) {
     return (
       <div className="flex flex-col min-h-screen bg-bg-canvas justify-between">
@@ -192,8 +239,23 @@ export default function ProductDetailPage({
     );
   }
 
-  // All image gallery options (Main image + Extra images)
-  const allImages = [product.image_url, ...extraImages.map((img) => img.image_url)].filter(Boolean);
+  const currentImageNumber = allImages.indexOf(selectedImage) + 1;
+
+  // Entrance animation untuk CTA WhatsApp: satu kali "glow" saat tombol pertama kali
+  // masuk viewport (bukan loop ambient tanpa henti). Dinonaktifkan bila reduced motion aktif.
+  const waEntranceVariants = {
+    hidden: { boxShadow: "0 0 0px 0px rgba(217,119,87,0)" },
+    visible: shouldReduceMotion
+      ? { boxShadow: "0 0 0px 0px rgba(217,119,87,0)" }
+      : {
+          boxShadow: [
+            "0 0 0px 0px rgba(217,119,87,0)",
+            "0 0 22px 6px rgba(217,119,87,0.45)",
+            "0 0 0px 0px rgba(217,119,87,0)",
+          ],
+          transition: { duration: 1.4, ease: "easeInOut" as const },
+        },
+  };
 
   return (
     <div className="flex flex-col min-h-screen bg-bg-canvas">
@@ -220,6 +282,7 @@ export default function ProductDetailPage({
               onMouseEnter={() => setIsZooming(true)}
               onMouseLeave={() => setIsZooming(false)}
               onMouseMove={handleImageMouseMove}
+              onClick={() => setIsLightboxOpen(true)}
               className="relative aspect-square w-full rounded-2xl overflow-hidden bg-neutral-100 border border-border-custom shadow-xs cursor-zoom-in"
             >
               <img
@@ -232,6 +295,19 @@ export default function ProductDetailPage({
                   isZooming ? "scale-[2.2]" : "scale-100"
                 }`}
               />
+
+              {/* Explicit zoom affordance — always available, most useful on touch devices
+                  where the hover-driven zoom above never triggers. */}
+              <button
+                onClick={(e) => {
+                  e.stopPropagation();
+                  setIsLightboxOpen(true);
+                }}
+                aria-label="Perbesar Gambar Produk"
+                className="absolute bottom-3 right-3 flex items-center justify-center h-9 w-9 rounded-full bg-black/45 text-white backdrop-blur-sm transition-colors hover:bg-black/60 sm:opacity-80 sm:hover:opacity-100 focus:outline-none focus:ring-2 focus:ring-white/60"
+              >
+                <ZoomIn className="h-4.5 w-4.5" />
+              </button>
             </div>
             
             {/* Clickable Image Thumbnails */}
@@ -351,45 +427,53 @@ export default function ProductDetailPage({
               </div>
             </div>
 
-            {/* Purchase Action Buttons */}
-            <div className="flex flex-col sm:flex-row items-center gap-4 pt-4">
-              {/* Add to Cart button */}
+            {/* Purchase Action Buttons — WhatsApp diperlakukan sebagai aksi utama
+                (sesuai model bisnis pesanan manual via WA), Keranjang sebagai aksi sekunder. */}
+            <div className="flex flex-col gap-3 pt-4">
+              {/* PRIMARY: Instant Checkout WA button (WA green is strictly protected!) */}
+              <motion.button
+                onClick={handleDirectWhatsApp}
+                variants={waEntranceVariants}
+                initial="hidden"
+                whileInView="visible"
+                viewport={{ once: true, amount: 0.6 }}
+                whileHover={shouldReduceMotion ? undefined : { scale: 1.015 }}
+                whileTap={{ scale: 0.97 }}
+                className="group relative w-full overflow-hidden py-4 sm:py-4.5 bg-accent hover:bg-accent-hover text-white text-base font-extrabold rounded-xl flex items-center justify-center gap-2 shadow-md transition-colors focus:ring-4 focus:ring-accent/30 cursor-pointer"
+              >
+                {!shouldReduceMotion && (
+                  <span
+                    aria-hidden="true"
+                    className="pointer-events-none absolute inset-y-0 left-0 w-1/3 -skew-x-12 bg-gradient-to-r from-white/0 via-white/25 to-white/0 -translate-x-[130%] transition-transform duration-700 ease-out group-hover:translate-x-[330%]"
+                  />
+                )}
+                <span className="relative z-10 flex items-center gap-2">
+                  <Sparkles className="h-4.5 w-4.5" />
+                  Pesan Instan via WhatsApp
+                </span>
+              </motion.button>
+
+              {/* SECONDARY: Add to Cart button */}
               <button
                 onClick={handleAddToCart}
-                className={`w-full py-4 text-sm font-bold rounded-xl flex items-center justify-center gap-2 shadow-xs transition-all border ${
+                className={`w-full py-3 text-xs font-semibold rounded-xl flex items-center justify-center gap-2 transition-all border ${
                   isAdded
                     ? "bg-emerald-50 border-emerald-200 text-emerald-600"
-                    : "bg-white border-border-strong hover:bg-surface text-primary"
+                    : "bg-white border-border-custom hover:bg-surface hover:border-border-strong text-text-secondary"
                 }`}
               >
                 {isAdded ? (
                   <>
-                    <Check className="h-4.5 w-4.5" />
+                    <Check className="h-4 w-4" />
                     Berhasil Ditambahkan!
                   </>
                 ) : (
                   <>
-                    <ShoppingBag className="h-4.5 w-4.5" />
+                    <ShoppingBag className="h-4 w-4" />
                     Tambahkan ke Keranjang
                   </>
                 )}
               </button>
-
-              {/* Instant Checkout WA button (WA green is strictly protected!) */}
-              <motion.button
-                onClick={handleDirectWhatsApp}
-                animate={{
-                  boxShadow: [
-                    "0 0 0px 0px rgba(217,119,87,0.0)",
-                    "0 0 18px 4px rgba(217,119,87,0.45)",
-                    "0 0 0px 0px rgba(217,119,87,0.0)",
-                  ],
-                }}
-                transition={{ duration: 2.2, repeat: Infinity, ease: "easeInOut" }}
-                className="w-full py-4 bg-accent hover:bg-accent-hover text-white text-sm font-extrabold rounded-xl flex items-center justify-center gap-2 shadow-md transition-colors focus:ring-4 focus:ring-accent/30 cursor-pointer"
-              >
-                Pesan Instan via WhatsApp
-              </motion.button>
             </div>
 
             {/* Material & Construction Assurance lists */}
@@ -421,6 +505,84 @@ export default function ProductDetailPage({
         </div>
 
       </main>
+
+      {/* Fullscreen Lightbox — tap-to-open image inspection, primarily for touch devices
+          where the hover-driven zoom above has no equivalent. Reuses selectedImage/allImages. */}
+      <AnimatePresence>
+        {isLightboxOpen && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            transition={{ duration: 0.2 }}
+            onClick={() => setIsLightboxOpen(false)}
+            className="fixed inset-0 z-[70] bg-black/90 backdrop-blur-sm flex flex-col"
+          >
+            {/* Top bar: image counter + close button */}
+            <div
+              onClick={(e) => e.stopPropagation()}
+              className="flex items-center justify-between px-4 sm:px-6 py-4 flex-shrink-0"
+            >
+              {allImages.length > 1 ? (
+                <span className="text-white/70 text-xs font-mono">
+                  {currentImageNumber} / {allImages.length}
+                </span>
+              ) : (
+                <span />
+              )}
+              <button
+                ref={lightboxCloseButtonRef}
+                onClick={() => setIsLightboxOpen(false)}
+                aria-label="Tutup Tampilan Gambar"
+                className="p-2 rounded-full bg-white/10 text-white hover:bg-white/20 transition-colors focus:outline-none focus:ring-2 focus:ring-white/60"
+              >
+                <X className="h-5 w-5" />
+              </button>
+            </div>
+
+            {/* Large image */}
+            <div
+              onClick={(e) => e.stopPropagation()}
+              className="flex-1 min-h-0 flex items-center justify-center px-4 pb-4"
+            >
+              <motion.img
+                key={selectedImage}
+                initial={{ opacity: 0, scale: 0.96 }}
+                animate={{ opacity: 1, scale: 1 }}
+                transition={{ duration: 0.2, ease: "easeOut" }}
+                src={selectedImage}
+                alt={product.name}
+                className="max-h-full max-w-full object-contain rounded-lg"
+              />
+            </div>
+
+            {/* Swipeable / tappable thumbnails, reusing the same selectedImage state */}
+            {allImages.length > 1 && (
+              <div
+                onClick={(e) => e.stopPropagation()}
+                className="px-4 sm:px-6 pb-6 pt-2 flex-shrink-0"
+              >
+                <div className="flex gap-3 overflow-x-auto snap-x snap-mandatory pb-1">
+                  {allImages.map((img, index) => (
+                    <button
+                      key={index}
+                      onClick={() => setSelectedImage(img)}
+                      aria-label={`Lihat gambar produk ${index + 1} dari ${allImages.length}`}
+                      className={`relative h-16 w-16 flex-shrink-0 snap-start overflow-hidden rounded-lg border-2 transition-all ${
+                        selectedImage === img
+                          ? "border-white"
+                          : "border-white/20 hover:border-white/50"
+                      }`}
+                    >
+                      <img src={img} alt="Detail" className="h-full w-full object-cover" />
+                    </button>
+                  ))}
+                </div>
+              </div>
+            )}
+          </motion.div>
+        )}
+      </AnimatePresence>
 
       <Footer />
     </div>
