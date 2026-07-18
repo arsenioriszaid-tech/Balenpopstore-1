@@ -1,10 +1,11 @@
 "use client";
 
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useState, useRef } from "react";
 import Header from "@/components/storefront/Header";
 import Footer from "@/components/storefront/Footer";
 import { supabase } from "@/lib/supabase/client";
 import { useCart } from "@/hooks/use-cart";
+import { motion, AnimatePresence } from "motion/react";
 import { 
   ShoppingBag, 
   Check, 
@@ -39,6 +40,19 @@ export default function ProductDetailPage({
   
   const [isLoading, setIsLoading] = useState(true);
   const [isAdded, setIsAdded] = useState(false);
+
+  // Image zoom-on-hover state
+  const [isZooming, setIsZooming] = useState(false);
+  const [zoomOrigin, setZoomOrigin] = useState({ x: 50, y: 50 });
+  const imageWrapRef = useRef<HTMLDivElement>(null);
+
+  const handleImageMouseMove = (e: React.MouseEvent<HTMLDivElement>) => {
+    const rect = imageWrapRef.current?.getBoundingClientRect();
+    if (!rect) return;
+    const x = ((e.clientX - rect.left) / rect.width) * 100;
+    const y = ((e.clientY - rect.top) / rect.height) * 100;
+    setZoomOrigin({ x, y });
+  };
 
   useEffect(() => {
     async function loadProductDetails() {
@@ -201,11 +215,22 @@ export default function ProductDetailPage({
           {/* LEFT: Multi-image Gallery */}
           <div className="lg:col-span-6 space-y-4">
             {/* Main Showcase Image Area */}
-            <div className="relative aspect-square w-full rounded-2xl overflow-hidden bg-neutral-100 border border-border-custom shadow-xs">
+            <div
+              ref={imageWrapRef}
+              onMouseEnter={() => setIsZooming(true)}
+              onMouseLeave={() => setIsZooming(false)}
+              onMouseMove={handleImageMouseMove}
+              className="relative aspect-square w-full rounded-2xl overflow-hidden bg-neutral-100 border border-border-custom shadow-xs cursor-zoom-in"
+            >
               <img
                 src={selectedImage}
                 alt={product.name}
-                className="h-full w-full object-cover transition-all"
+                style={{
+                  transformOrigin: `${zoomOrigin.x}% ${zoomOrigin.y}%`,
+                }}
+                className={`h-full w-full object-cover transition-transform duration-200 ease-out ${
+                  isZooming ? "scale-[2.2]" : "scale-100"
+                }`}
               />
             </div>
             
@@ -244,10 +269,19 @@ export default function ProductDetailPage({
               </h1>
               
               {/* Computed Price - tabular nums */}
-              <div className="pt-2">
-                <span className="font-mono text-xl sm:text-2xl font-black text-primary font-tabular">
-                  {formatIDR(displayedPrice)}
-                </span>
+              <div className="pt-2 overflow-hidden">
+                <AnimatePresence mode="wait">
+                  <motion.span
+                    key={displayedPrice}
+                    initial={{ opacity: 0, y: 14 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    exit={{ opacity: 0, y: -14 }}
+                    transition={{ duration: 0.25, ease: "easeOut" }}
+                    className="inline-block font-mono text-xl sm:text-2xl font-black text-primary font-tabular"
+                  >
+                    {formatIDR(displayedPrice)}
+                  </motion.span>
+                </AnimatePresence>
               </div>
             </div>
 
@@ -342,12 +376,20 @@ export default function ProductDetailPage({
               </button>
 
               {/* Instant Checkout WA button (WA green is strictly protected!) */}
-              <button
+              <motion.button
                 onClick={handleDirectWhatsApp}
-                className="w-full py-4 bg-accent hover:bg-accent-hover text-white text-sm font-extrabold rounded-xl flex items-center justify-center gap-2 shadow-md transition-all focus:ring-4 focus:ring-accent/30 cursor-pointer"
+                animate={{
+                  boxShadow: [
+                    "0 0 0px 0px rgba(217,119,87,0.0)",
+                    "0 0 18px 4px rgba(217,119,87,0.45)",
+                    "0 0 0px 0px rgba(217,119,87,0.0)",
+                  ],
+                }}
+                transition={{ duration: 2.2, repeat: Infinity, ease: "easeInOut" }}
+                className="w-full py-4 bg-accent hover:bg-accent-hover text-white text-sm font-extrabold rounded-xl flex items-center justify-center gap-2 shadow-md transition-colors focus:ring-4 focus:ring-accent/30 cursor-pointer"
               >
                 Pesan Instan via WhatsApp
-              </button>
+              </motion.button>
             </div>
 
             {/* Material & Construction Assurance lists */}
