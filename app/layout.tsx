@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import { Inter, JetBrains_Mono } from "next/font/google";
+import { Toaster } from "sonner";
 import { CartProvider } from "@/hooks/use-cart";
 import "./globals.css";
 
@@ -32,6 +33,23 @@ export default function RootLayout({
         <CartProvider>
           {children}
         </CartProvider>
+        <Toaster
+          position="top-center"
+          richColors
+          closeButton
+          toastOptions={{
+            duration: 3500,
+            className: "font-sans",
+            style: {
+              fontFamily: "var(--font-sans)",
+              background: "var(--color-surface)",
+              color: "var(--color-text-primary)",
+              border: "1px solid var(--color-border-custom)",
+              borderRadius: "var(--radius-lg)",
+              boxShadow: "var(--shadow-premium)",
+            },
+          }}
+        />
       </body>
     </html>
   );
