@@ -8,9 +8,9 @@
   --color-accent-hover: #20bd5a;
   
   --color-bg-canvas: #ffffff;
-  --color-surface: #f4f4f5;
-  --color-surface-2: #ffffff;
-  --color-surface-hover: #fafafa;
+  --color-surface: #ffffff;
+  --color-surface-2: #fbfbfc;
+  --color-surface-hover: #f7f7f8;
   
   --color-text-primary: #18181b;
   --color-text-secondary: #52525b;
@@ -34,11 +34,29 @@
   --shadow-md: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
   --shadow-lg: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05);
   --shadow-focus: 0 0 0 3px rgba(37, 211, 102, 0.35);
+
+  /* Editorial Premium: soft, wide, low-opacity elevation — melayang, bukan menekan */
+  --shadow-premium: 0 2px 4px rgba(24, 24, 27, 0.02),
+    0 12px 24px -8px rgba(24, 24, 27, 0.06),
+    0 24px 48px -16px rgba(24, 24, 27, 0.08);
+
+  /* Easing organik untuk semua transisi hover/active */
+  --ease-organic: cubic-bezier(0.4, 0, 0.2, 1);
+  --duration-fast: 150ms;
+  --duration-base: 250ms;
 }
 
 @layer utilities {
   .font-tabular {
     font-variant-numeric: tabular-nums;
+  }
+
+  /* Editorial Premium: kaca buram untuk nav/modal/card mengambang */
+  .glass-morphism {
+    background-color: rgba(255, 255, 255, 0.72);
+    backdrop-filter: blur(16px) saturate(180%);
+    -webkit-backdrop-filter: blur(16px) saturate(180%);
+    border: 1px solid rgba(228, 228, 231, 0.5);
   }
 }
 
@@ -48,4 +66,22 @@ body {
   color: var(--color-text-primary);
   margin: 0;
   padding: 0;
+}
+
+@layer base {
+  /* Editorial Premium: heading lebih tegas & rapat, mengesankan headline majalah */
+  h1, h2, h3, h4, h5, h6 {
+    font-weight: 700;
+    letter-spacing: -0.015em;
+  }
+
+  /* Default easing organik untuk elemen interaktif native, bukan linear */
+  a,
+  button,
+  input,
+  select,
+  textarea {
+    transition-timing-function: var(--ease-organic);
+    transition-duration: var(--duration-base);
+  }
 }
