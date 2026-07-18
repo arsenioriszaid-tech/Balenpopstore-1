@@ -6,6 +6,13 @@ import Header from "@/components/storefront/Header";
 import Footer from "@/components/storefront/Footer";
 import { supabase } from "@/lib/supabase/client";
 import { useCart } from "@/hooks/use-cart";
+import {
+  motion,
+  AnimatePresence,
+  useMotionValue,
+  useSpring,
+  useTransform,
+} from "motion/react";
 import { 
   Search, 
   ShoppingBag, 
@@ -17,6 +24,150 @@ import {
   Filter
 } from "lucide-react";
 import Link from "next/link";
+
+// Shimmer sweep block used to build skeleton placeholders
+function ShimmerBlock({ className = "" }: { className?: string }) {
+  return (
+    <div className={`relative overflow-hidden bg-neutral-200 ${className}`}>
+      <motion.div
+        className="absolute inset-0 bg-gradient-to-r from-transparent via-white/70 to-transparent"
+        initial={{ x: "-100%" }}
+        animate={{ x: "100%" }}
+        transition={{ duration: 1.3, repeat: Infinity, ease: "linear" }}
+      />
+    </div>
+  );
+}
+
+// Skeleton that mirrors the real product card's shape (image, title lines, price, button)
+function ProductCardSkeleton() {
+  return (
+    <div className="bg-white border border-border-custom rounded-xl p-3 sm:p-4 flex flex-col justify-between">
+      <div className="space-y-2.5 sm:space-y-3 flex-1">
+        <ShimmerBlock className="aspect-square w-full rounded-lg" />
+        <div className="space-y-1.5">
+          <ShimmerBlock className="h-3.5 rounded w-4/5" />
+          <ShimmerBlock className="h-3.5 rounded w-1/2" />
+          <ShimmerBlock className="h-4 rounded w-2/5 mt-1" />
+        </div>
+      </div>
+      <div className="mt-3 sm:mt-4 pt-3 border-t border-border-custom">
+        <ShimmerBlock className="h-8 rounded-md w-full" />
+      </div>
+    </div>
+  );
+}
+
+// Product card with a subtle 3D tilt-on-hover effect, plus layoutId for smooth
+// re-ordering when the category/search filter changes.
+function ProductCard({
+  product,
+  formatIDR,
+  handleQuickAdd,
+  successProductId,
+}: {
+  product: any;
+  formatIDR: (price: number) => string;
+  handleQuickAdd: (product: any) => void;
+  successProductId: string | null;
+}) {
+  const tiltX = useMotionValue(0);
+  const tiltY = useMotionValue(0);
+  const rotateX = useSpring(useTransform(tiltY, [-0.5, 0.5], [9, -9]), {
+    stiffness: 300,
+    damping: 25,
+  });
+  const rotateY = useSpring(useTransform(tiltX, [-0.5, 0.5], [-9, 9]), {
+    stiffness: 300,
+    damping: 25,
+  });
+  const tiltScale = useSpring(1, { stiffness: 300, damping: 25 });
+
+  function handleMouseMove(e: React.MouseEvent<HTMLDivElement>) {
+    const rect = e.currentTarget.getBoundingClientRect();
+    tiltX.set((e.clientX - rect.left) / rect.width - 0.5);
+    tiltY.set((e.clientY - rect.top) / rect.height - 0.5);
+  }
+  function handleMouseEnter() {
+    tiltScale.set(1.03);
+  }
+  function handleMouseLeave() {
+    tiltX.set(0);
+    tiltY.set(0);
+    tiltScale.set(1);
+  }
+
+  return (
+    <motion.div
+      layout
+      layoutId={product.id}
+      initial={{ opacity: 0, scale: 0.9 }}
+      animate={{ opacity: 1, scale: 1 }}
+      exit={{ opacity: 0, scale: 0.9 }}
+      transition={{ duration: 0.35, ease: "easeOut" }}
+      onMouseMove={handleMouseMove}
+      onMouseEnter={handleMouseEnter}
+      onMouseLeave={handleMouseLeave}
+      style={{
+        rotateX,
+        rotateY,
+        scale: tiltScale,
+        transformPerspective: 700,
+      }}
+      className="bg-white border border-border-custom hover:border-border-strong rounded-xl p-3 sm:p-4 hover:shadow-xl transition-[border-color,box-shadow] flex flex-col justify-between group will-change-transform"
+    >
+      <Link href={`/catalog/${product.id}`} className="space-y-2.5 sm:space-y-3 block flex-1">
+        {/* Image ratio 1:1 or 4:3 with gray placeholder before loading */}
+        <div className="relative aspect-square w-full rounded-lg overflow-hidden bg-neutral-100 border border-border-custom flex-shrink-0">
+          {product.image_url ? (
+            <img
+              src={product.image_url}
+              alt={product.name}
+              className="h-full w-full object-cover transition-transform duration-500 group-hover:scale-105"
+            />
+          ) : (
+            <div className="h-full w-full bg-neutral-200 flex items-center justify-center text-text-muted text-xs">
+              No Image
+            </div>
+          )}
+        </div>
+
+        <div className="space-y-1 sm:space-y-1.5">
+          <h3 className="font-sans text-xs sm:text-sm font-bold text-primary line-clamp-2 leading-snug group-hover:text-accent transition-colors">
+            {product.name}
+          </h3>
+          <p className="font-mono text-sm font-extrabold text-primary font-tabular">
+            {formatIDR(product.price)}
+          </p>
+        </div>
+      </Link>
+
+      <div className="mt-3 sm:mt-4 pt-3 border-t border-border-custom">
+        <button
+          onClick={() => handleQuickAdd(product)}
+          disabled={successProductId === product.id}
+          className={`w-full py-1.5 sm:py-2 text-xs font-semibold rounded-md transition-colors flex items-center justify-center gap-1.5 cursor-pointer ${
+            successProductId === product.id
+              ? "bg-emerald-50 text-emerald-600 border border-emerald-200"
+              : "bg-surface text-text-primary border border-border-strong hover:bg-primary hover:text-white hover:border-primary"
+          }`}
+        >
+          {successProductId === product.id ? (
+            <>
+              <Check className="h-3.5 w-3.5" />
+              Masuk!
+            </>
+          ) : (
+            <>
+              <ShoppingBag className="h-3.5 w-3.5" />
+              Beli Cepat
+            </>
+          )}
+        </button>
+      </div>
+    </motion.div>
+  );
+}
 
 function CatalogContent() {
   const router = useRouter();
@@ -218,13 +369,9 @@ function CatalogContent() {
 
             {/* Products Responsive Grid (2-columns strictly on mobile, up to 4 on desktop!) */}
             {isLoading ? (
-              <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4 sm:gap-6">
-                {[1, 2, 3, 4, 5, 6].map((i) => (
-                  <div key={i} className="animate-pulse bg-white border border-border-custom rounded-xl p-4 space-y-4 h-80">
-                    <div className="aspect-square bg-neutral-200 rounded-lg w-full" />
-                    <div className="h-4 bg-neutral-200 rounded w-2/3" />
-                    <div className="h-4 bg-neutral-200 rounded w-1/3" />
-                  </div>
+              <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3 sm:gap-6">
+                {Array.from({ length: 8 }).map((_, i) => (
+                  <ProductCardSkeleton key={i} />
                 ))}
               </div>
             ) : currentItems.length === 0 ? (
@@ -251,62 +398,17 @@ function CatalogContent() {
             ) : (
               <>
                 <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3 sm:gap-6">
-                  {currentItems.map((product) => (
-                    <div
-                      key={product.id}
-                      className="bg-white border border-border-custom hover:border-border-strong rounded-xl p-3 sm:p-4 hover:shadow-md transition-all flex flex-col justify-between group"
-                    >
-                      <Link href={`/catalog/${product.id}`} className="space-y-2.5 sm:space-y-3 block flex-1">
-                        {/* Image ratio 1:1 or 4:3 with gray placeholder before loading */}
-                        <div className="relative aspect-square w-full rounded-lg overflow-hidden bg-neutral-100 border border-border-custom flex-shrink-0">
-                          {product.image_url ? (
-                            <img
-                              src={product.image_url}
-                              alt={product.name}
-                              className="h-full w-full object-cover transition-transform duration-500 group-hover:scale-105"
-                            />
-                          ) : (
-                            <div className="h-full w-full bg-neutral-200 flex items-center justify-center text-text-muted text-xs">
-                              No Image
-                            </div>
-                          )}
-                        </div>
-
-                        <div className="space-y-1 sm:space-y-1.5">
-                          <h3 className="font-sans text-xs sm:text-sm font-bold text-primary line-clamp-2 leading-snug group-hover:text-accent transition-colors">
-                            {product.name}
-                          </h3>
-                          <p className="font-mono text-sm font-extrabold text-primary font-tabular">
-                            {formatIDR(product.price)}
-                          </p>
-                        </div>
-                      </Link>
-
-                      <div className="mt-3 sm:mt-4 pt-3 border-t border-border-custom">
-                        <button
-                          onClick={() => handleQuickAdd(product)}
-                          disabled={successProductId === product.id}
-                          className={`w-full py-1.5 sm:py-2 text-xs font-semibold rounded-md transition-colors flex items-center justify-center gap-1.5 cursor-pointer ${
-                            successProductId === product.id
-                              ? "bg-emerald-50 text-emerald-600 border border-emerald-200"
-                              : "bg-surface text-text-primary border border-border-strong hover:bg-primary hover:text-white hover:border-primary"
-                          }`}
-                        >
-                          {successProductId === product.id ? (
-                            <>
-                              <Check className="h-3.5 w-3.5" />
-                              Masuk!
-                            </>
-                          ) : (
-                            <>
-                              <ShoppingBag className="h-3.5 w-3.5" />
-                              Beli Cepat
-                            </>
-                          )}
-                        </button>
-                      </div>
-                    </div>
-                  ))}
+                  <AnimatePresence mode="popLayout">
+                    {currentItems.map((product) => (
+                      <ProductCard
+                        key={product.id}
+                        product={product}
+                        formatIDR={formatIDR}
+                        handleQuickAdd={handleQuickAdd}
+                        successProductId={successProductId}
+                      />
+                    ))}
+                  </AnimatePresence>
                 </div>
 
                 {/* Pagination Controls */}
