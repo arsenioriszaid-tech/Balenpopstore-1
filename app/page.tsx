@@ -1,12 +1,12 @@
 "use client";
 
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useState, useRef } from "react";
 import Link from "next/link";
 import Header from "@/components/storefront/Header";
 import Footer from "@/components/storefront/Footer";
 import { supabase } from "@/lib/supabase/client";
 import { useCart } from "@/hooks/use-cart";
-import { motion } from "motion/react";
+import { motion, useScroll, useTransform } from "motion/react";
 import { 
   ArrowRight, 
   ShieldCheck, 
@@ -20,6 +20,18 @@ import {
   UtensilsCrossed
 } from "lucide-react";
 
+// Fixed steam/particle configuration (kept static so SSR/CSR markup matches)
+const STEAM_PARTICLES = [
+  { left: "8%", top: "70%", size: 6, duration: 6, delay: 0 },
+  { left: "18%", top: "85%", size: 4, duration: 7.5, delay: 0.8 },
+  { left: "82%", top: "78%", size: 5, duration: 6.5, delay: 1.4 },
+  { left: "90%", top: "60%", size: 4, duration: 8, delay: 0.3 },
+  { left: "50%", top: "92%", size: 5, duration: 7, delay: 1.9 },
+  { left: "30%", top: "12%", size: 4, duration: 6.8, delay: 1.1 },
+  { left: "70%", top: "15%", size: 5, duration: 7.2, delay: 0.5 },
+  { left: "95%", top: "35%", size: 3, duration: 6.2, delay: 2.2 },
+];
+
 export default function HomePage() {
   const { addToCart } = useCart();
   const [categories, setCategories] = useState<any[]>([]);
@@ -27,6 +39,15 @@ export default function HomePage() {
   const [isLoading, setIsLoading] = useState(true);
   const [successProductId, setSuccessProductId] = useState<string | null>(null);
   const [heroImage, setHeroImage] = useState("/uploads/hero_main.jpg");
+
+  // Parallax scroll tracking for the hero section
+  const heroRef = useRef<HTMLElement>(null);
+  const { scrollYProgress: heroScrollProgress } = useScroll({
+    target: heroRef,
+    offset: ["start start", "end start"],
+  });
+  const heroImageY = useTransform(heroScrollProgress, [0, 1], [0, 90]);
+  const heroBlobY = useTransform(heroScrollProgress, [0, 1], [0, -60]);
 
   useEffect(() => {
     async function loadData() {
@@ -77,28 +98,72 @@ export default function HomePage() {
       <Header />
 
       {/* Hero Section */}
-      <section className="relative bg-gradient-to-b from-surface/50 to-white pt-12 pb-20 md:py-28 overflow-hidden border-b border-border-custom">
-        {/* Subtle Decorative Background Blob */}
-        <div className="absolute top-[-20%] right-[-10%] w-[50%] h-[60%] rounded-full bg-accent/5 blur-3xl" />
-        
+      <section
+        ref={heroRef}
+        className="relative bg-gradient-to-b from-surface/50 to-white pt-12 pb-20 md:py-28 overflow-hidden border-b border-border-custom"
+      >
+        {/* Animated Gradient Blob - moves very slowly, drifts with scroll */}
+        <motion.div
+          className="absolute top-[-20%] right-[-10%] w-[55%] h-[65%] rounded-full blur-3xl"
+          style={{ y: heroBlobY }}
+          animate={{
+            background: [
+              "radial-gradient(circle at 30% 30%, rgba(217,119,87,0.10), rgba(31,41,55,0.05) 60%)",
+              "radial-gradient(circle at 70% 40%, rgba(217,119,87,0.14), rgba(31,41,55,0.06) 60%)",
+              "radial-gradient(circle at 40% 65%, rgba(217,119,87,0.10), rgba(31,41,55,0.05) 60%)",
+              "radial-gradient(circle at 30% 30%, rgba(217,119,87,0.10), rgba(31,41,55,0.05) 60%)",
+            ],
+            scale: [1, 1.08, 0.97, 1],
+          }}
+          transition={{
+            duration: 26,
+            repeat: Infinity,
+            ease: "easeInOut",
+          }}
+        />
+
         <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 relative z-10">
           <div className="grid grid-cols-1 lg:grid-cols-12 gap-12 items-center">
             
             {/* Hero Text Info */}
             <div className="lg:col-span-7 space-y-6 text-center lg:text-left">
-              <div className="inline-flex items-center gap-2 px-3 py-1 bg-primary/5 text-primary text-xs font-mono font-bold rounded-full uppercase tracking-wider">
+              <motion.div
+                initial={{ opacity: 0, y: 24 }}
+                whileInView={{ opacity: 1, y: 0 }}
+                viewport={{ once: true, amount: 0.6 }}
+                transition={{ duration: 0.6, ease: "easeOut" }}
+                className="inline-flex items-center gap-2 px-3 py-1 bg-primary/5 text-primary text-xs font-mono font-bold rounded-full uppercase tracking-wider"
+              >
                 <Sparkles className="h-3.5 w-3.5 text-accent animate-pulse" />
                 Handcrafted Premium Stainless Steel
-              </div>
-              <h1 className="font-sans text-3xl sm:text-4xl lg:text-5xl font-extrabold tracking-tight text-primary leading-tight">
+              </motion.div>
+              <motion.h1
+                initial={{ opacity: 0, y: 32 }}
+                whileInView={{ opacity: 1, y: 0 }}
+                viewport={{ once: true, amount: 0.6 }}
+                transition={{ duration: 0.7, ease: "easeOut", delay: 0.1 }}
+                className="font-sans text-3xl sm:text-4xl lg:text-5xl font-extrabold tracking-tight text-primary leading-tight"
+              >
                 Klakat Kukusan Stainless <span className="text-transparent bg-clip-text bg-gradient-to-r from-primary to-accent">Kualitas Juara</span> Untuk UMKM Kuliner
-              </h1>
-              <p className="text-text-secondary text-base md:text-lg max-w-2xl mx-auto lg:mx-0 leading-relaxed">
+              </motion.h1>
+              <motion.p
+                initial={{ opacity: 0, y: 32 }}
+                whileInView={{ opacity: 1, y: 0 }}
+                viewport={{ once: true, amount: 0.6 }}
+                transition={{ duration: 0.7, ease: "easeOut", delay: 0.2 }}
+                className="text-text-secondary text-base md:text-lg max-w-2xl mx-auto lg:mx-0 leading-relaxed"
+              >
                 Tebal, awet, dan anti karat. Didesain khusus dengan tutup piramida presisi sehingga uap air kondensasi tidak menetes merusak cita rasa kue, dimsum, atau bakpao Anda.
-              </p>
+              </motion.p>
               
               {/* Action Buttons */}
-              <div className="flex flex-col sm:flex-row items-center justify-center lg:justify-start gap-4 pt-2">
+              <motion.div
+                initial={{ opacity: 0, y: 24 }}
+                whileInView={{ opacity: 1, y: 0 }}
+                viewport={{ once: true, amount: 0.6 }}
+                transition={{ duration: 0.6, ease: "easeOut", delay: 0.3 }}
+                className="flex flex-col sm:flex-row items-center justify-center lg:justify-start gap-4 pt-2"
+              >
                 <Link
                   href="/catalog"
                   className="w-full sm:w-auto px-8 py-3.5 bg-primary hover:bg-primary-hover text-white text-sm font-semibold rounded-lg shadow-md transition-all flex items-center justify-center gap-2 group cursor-pointer"
@@ -116,12 +181,44 @@ export default function HomePage() {
                   <PhoneCall className="h-4 w-4 text-accent" />
                   Konsultasi WA (Gratis)
                 </motion.a>
-              </div>
+              </motion.div>
             </div>
 
             {/* Hero Visual Showcase */}
             <div className="lg:col-span-5 relative flex justify-center">
-              <div className="relative w-full max-w-sm aspect-square bg-surface border border-border-custom rounded-2xl p-4 shadow-lg overflow-hidden group">
+              {/* Floating steam particles around the product image */}
+              <div className="pointer-events-none absolute inset-0 z-20">
+                {STEAM_PARTICLES.map((p, i) => (
+                  <motion.span
+                    key={i}
+                    className="absolute rounded-full bg-white/70 blur-[1px]"
+                    style={{
+                      left: p.left,
+                      top: p.top,
+                      width: p.size,
+                      height: p.size,
+                    }}
+                    initial={{ opacity: 0, y: 0 }}
+                    animate={{
+                      opacity: [0, 0.8, 0],
+                      y: [-4, -46],
+                      x: [0, i % 2 === 0 ? 8 : -8, 0],
+                      scale: [0.8, 1.1, 0.6],
+                    }}
+                    transition={{
+                      duration: p.duration,
+                      delay: p.delay,
+                      repeat: Infinity,
+                      ease: "easeInOut",
+                    }}
+                  />
+                ))}
+              </div>
+
+              <motion.div
+                style={{ y: heroImageY }}
+                className="relative w-full max-w-sm aspect-square bg-surface border border-border-custom rounded-2xl p-4 shadow-lg overflow-hidden group"
+              >
                 <div className="absolute inset-0 bg-gradient-to-t from-primary/10 to-transparent z-10" />
                 <img
                   src={heroImage}
@@ -143,7 +240,7 @@ export default function HomePage() {
                     </span>
                   </div>
                 </div>
-              </div>
+              </motion.div>
             </div>
 
           </div>
