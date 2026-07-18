@@ -1,5 +1,5 @@
 import type { Metadata } from "next";
-import { Inter, JetBrains_Mono } from "next/font/google";
+import { Inter, JetBrains_Mono, Fraunces } from "next/font/google";
 import { Toaster } from "sonner";
 import { CartProvider } from "@/hooks/use-cart";
 import "./globals.css";
@@ -12,6 +12,16 @@ const inter = Inter({
 const jetbrainsMono = JetBrains_Mono({
   subsets: ["latin"],
   variable: "--font-mono",
+});
+
+// Editorial Premium: warm serif display face for headings — gives the brand a
+// crafted/artisan feel (matches the family-workshop heritage story) instead of
+// the generic SaaS look of an all-sans-serif type system. Exposed as
+// --font-display-family, which app/globals.css references via --font-display.
+const fraunces = Fraunces({
+  subsets: ["latin"],
+  weight: ["600", "700", "800"],
+  variable: "--font-display-family",
 });
 
 export const metadata: Metadata = {
@@ -27,7 +37,7 @@ export default function RootLayout({
   return (
     <html
       lang="id"
-      className={`${inter.variable} ${jetbrainsMono.variable}`}
+      className={`${inter.variable} ${jetbrainsMono.variable} ${fraunces.variable}`}
     >
       <body className="bg-bg-canvas text-text-primary antialiased min-h-screen selection:bg-accent selection:text-white" suppressHydrationWarning>
         <CartProvider>
