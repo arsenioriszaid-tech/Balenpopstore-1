@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useEffect, useState, Suspense } from "react";
+import React, { useEffect, useState, useRef, Suspense } from "react";
 import { useSearchParams, useRouter } from "next/navigation";
 import Header from "@/components/storefront/Header";
 import Footer from "@/components/storefront/Footer";
@@ -60,16 +60,24 @@ function ProductCardSkeleton() {
 
 // Product card with a subtle 3D tilt-on-hover effect, plus layoutId for smooth
 // re-ordering when the category/search filter changes.
+//
+// Touch devices never fire onMouseMove, so the tilt naturally stays inert there —
+// that's fine, but it means touch users need their own tactile response instead of
+// silence: onTapStart/onTap/onTapCancel drive the same `tiltScale` spring used by the
+// desktop hover effect for a quick press-in/press-out "squish", and `whileHover` adds
+// an animated shadow lift for any pointer that actually supports hovering.
 function ProductCard({
   product,
   formatIDR,
   handleQuickAdd,
   successProductId,
+  index,
 }: {
   product: any;
   formatIDR: (price: number) => string;
   handleQuickAdd: (product: any) => void;
   successProductId: string | null;
+  index: number;
 }) {
   const tiltX = useMotionValue(0);
   const tiltY = useMotionValue(0);
@@ -97,24 +105,45 @@ function ProductCard({
     tiltScale.set(1);
   }
 
+  // Press feedback (works for both touch taps and mouse clicks) — reuses the same
+  // tiltScale spring that already drives the desktop hover "lift", so there's a single
+  // source of truth for the card's scale instead of two competing animation systems.
+  function handleTapStart() {
+    tiltScale.set(0.97);
+  }
+  function handleTapEnd() {
+    tiltScale.set(1);
+  }
+
   return (
     <motion.div
       layout
       layoutId={product.id}
-      initial={{ opacity: 0, scale: 0.9 }}
-      animate={{ opacity: 1, scale: 1 }}
-      exit={{ opacity: 0, scale: 0.9 }}
-      transition={{ duration: 0.35, ease: "easeOut" }}
+      initial={{ opacity: 0, scale: 0.9, y: 12 }}
+      animate={{
+        opacity: 1,
+        scale: 1,
+        y: 0,
+        transition: { duration: 0.35, ease: "easeOut", delay: Math.min(index * 0.035, 0.28) },
+      }}
+      exit={{ opacity: 0, scale: 0.9, transition: { duration: 0.2, ease: "easeOut" } }}
       onMouseMove={handleMouseMove}
       onMouseEnter={handleMouseEnter}
       onMouseLeave={handleMouseLeave}
+      onTapStart={handleTapStart}
+      onTap={handleTapEnd}
+      onTapCancel={handleTapEnd}
+      whileHover={{
+        boxShadow: "0 20px 45px -14px rgba(15, 23, 42, 0.28)",
+        transition: { duration: 0.25, ease: "easeOut" },
+      }}
       style={{
         rotateX,
         rotateY,
         scale: tiltScale,
         transformPerspective: 700,
       }}
-      className="bg-white border border-border-custom hover:border-border-strong rounded-xl p-3 sm:p-4 hover:shadow-xl transition-[border-color,box-shadow] flex flex-col justify-between group will-change-transform"
+      className="bg-white border border-border-custom hover:border-border-strong rounded-xl p-3 sm:p-4 transition-colors flex flex-col justify-between group will-change-transform"
     >
       <Link href={`/catalog/${product.id}`} className="space-y-2.5 sm:space-y-3 block flex-1">
         {/* Image ratio 1:1 or 4:3 with gray placeholder before loading */}
@@ -188,6 +217,10 @@ function CatalogContent() {
   const [currentPage, setCurrentPage] = useState(1);
   const itemsPerPage = 8;
 
+  // Refs to each mobile category pill button, keyed by category id ("all" included),
+  // so the active pill can be scrolled into view after selection.
+  const mobilePillRefs = useRef<Record<string, HTMLButtonElement | null>>({});
+
   useEffect(() => {
     async function loadCatalog() {
       try {
@@ -233,6 +266,14 @@ function CatalogContent() {
     setFilteredProducts(result);
     setCurrentPage(1); // Reset page on filter change
   }, [products, selectedCategory, searchQuery]);
+
+  // Keep the active mobile category pill visible: whenever the selected category
+  // changes (or categories finish loading, covering direct-link edge cases), scroll
+  // its pill button into view within the horizontally-scrolling row.
+  useEffect(() => {
+    const activePill = mobilePillRefs.current[selectedCategory];
+    activePill?.scrollIntoView({ behavior: "smooth", inline: "center", block: "nearest" });
+  }, [selectedCategory, categories]);
 
   const handleCategoryChange = (catId: string) => {
     const params = new URLSearchParams(searchParams.toString());
@@ -343,6 +384,9 @@ function CatalogContent() {
             {/* Mobile Category Pill Slider */}
             <div className="flex lg:hidden overflow-x-auto gap-2 pb-2 scrollbar-none">
               <button
+                ref={(el) => {
+                  mobilePillRefs.current["all"] = el;
+                }}
                 onClick={() => handleCategoryChange("all")}
                 className={`flex-shrink-0 px-4 py-1.5 text-xs font-semibold rounded-full border transition-all ${
                   selectedCategory === "all"
@@ -355,6 +399,9 @@ function CatalogContent() {
               {categories.map((cat) => (
                 <button
                   key={cat.id}
+                  ref={(el) => {
+                    mobilePillRefs.current[cat.id] = el;
+                  }}
                   onClick={() => handleCategoryChange(cat.id)}
                   className={`flex-shrink-0 px-4 py-1.5 text-xs font-semibold rounded-full border transition-all ${
                     selectedCategory === cat.id
@@ -399,13 +446,14 @@ function CatalogContent() {
               <>
                 <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3 sm:gap-6">
                   <AnimatePresence mode="popLayout">
-                    {currentItems.map((product) => (
+                    {currentItems.map((product, index) => (
                       <ProductCard
                         key={product.id}
                         product={product}
                         formatIDR={formatIDR}
                         handleQuickAdd={handleQuickAdd}
                         successProductId={successProductId}
+                        index={index}
                       />
                     ))}
                   </AnimatePresence>
