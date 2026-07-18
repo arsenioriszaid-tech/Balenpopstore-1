@@ -38,7 +38,9 @@ export default function HomePage() {
   const [products, setProducts] = useState<any[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [successProductId, setSuccessProductId] = useState<string | null>(null);
-  const [heroImage, setHeroImage] = useState("/uploads/hero_main.jpg");
+  const [heroImage, setHeroImage] = useState(
+  "https://ixuicwskzakgelmhcfsh.supabase.co/storage/v1/object/public/product-images/hero/hero_main.jpg"
+);
 
   // Parallax scroll tracking for the hero section
   const heroRef = useRef<HTMLElement>(null);
