@@ -15,10 +15,11 @@ import {
   MapPin, 
   User, 
   ArrowRight,
+  ArrowLeft,
   Sparkles
 } from "lucide-react";
 import { cn } from "@/lib/utils";
-import { AnimatePresence, motion, useMotionValue, useSpring } from "motion/react";
+import { AnimatePresence, motion, useMotionValue, useSpring, useReducedMotion } from "motion/react";
 import { toast } from "sonner";
 
 // Varian animasi stagger untuk daftar menu navigasi mobile
@@ -40,6 +41,18 @@ const mobileNavItemVariants = {
     x: 0,
     transition: { duration: 0.35, ease: [0.4, 0, 0.2, 1] as const },
   },
+};
+
+// Easing "organic" bersama — konsisten dengan token --ease-organic yang dipakai
+// di seluruh sistem desain, untuk transisi panel & polish tombol CTA.
+const organicEase = [0.4, 0, 0.2, 1] as const;
+
+// Varian cross-fade/slide untuk swap konten di dalam panel drawer yang sama
+// (cart view <-> checkout view), menggantikan modal terpisah.
+const panelViewVariants = {
+  enter: { opacity: 0, x: 24 },
+  center: { opacity: 1, x: 0, transition: { duration: 0.3, ease: organicEase } },
+  exit: { opacity: 0, x: -24, transition: { duration: 0.2, ease: organicEase } },
 };
 
 /**
@@ -83,6 +96,7 @@ function MagneticShoppingBagIcon({ className }: { className?: string }) {
 export default function Header() {
   const pathname = usePathname();
   const { items, cartCount, cartTotal, updateQuantity, removeFromCart, clearCart } = useCart();
+  const shouldReduceMotion = useReducedMotion();
   
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const [isCartOpen, setIsCartOpen] = useState(false);
@@ -98,12 +112,45 @@ export default function Header() {
   const previousCartCountRef = useRef(cartCount);
   const [badgeBumpKey, setBadgeBumpKey] = useState(0);
 
+  // Refs untuk manajemen fokus sederhana pada panel drawer (cart & checkout)
+  const cartCloseButtonRef = useRef<HTMLButtonElement>(null);
+  const customerNameInputRef = useRef<HTMLInputElement>(null);
+
   useEffect(() => {
     if (cartCount > previousCartCountRef.current) {
       setBadgeBumpKey((prev) => prev + 1);
     }
     previousCartCountRef.current = cartCount;
   }, [cartCount]);
+
+  // Pindahkan fokus ke elemen yang relevan setiap kali tampilan panel berganti,
+  // agar pengguna keyboard/screen reader tetap terorientasi tanpa dependency baru.
+  useEffect(() => {
+    if (!isCartOpen) return;
+    const focusTimeout = window.setTimeout(() => {
+      if (isCheckoutOpen) {
+        customerNameInputRef.current?.focus();
+      } else {
+        cartCloseButtonRef.current?.focus();
+      }
+    }, 50);
+    return () => window.clearTimeout(focusTimeout);
+  }, [isCartOpen, isCheckoutOpen]);
+
+  // Tutup drawer/menu aktif dengan tombol Escape
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key !== "Escape") return;
+      if (isCartOpen) {
+        setIsCartOpen(false);
+        setIsCheckoutOpen(false);
+      } else if (isMobileMenuOpen) {
+        setIsMobileMenuOpen(false);
+      }
+    };
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, [isCartOpen, isMobileMenuOpen]);
 
   const navLinks = [
     { name: "Beranda", href: "/" },
@@ -202,6 +249,34 @@ export default function Header() {
         });
         window.open(waUrl, "_blank");
       });
+  };
+
+  const closeCartEntirely = () => {
+    setIsCartOpen(false);
+    setIsCheckoutOpen(false);
+  };
+
+  // Variants tombol CTA WhatsApp: scale + shadow lift halus saat hover/tap,
+  // dinonaktifkan otomatis kalau pengguna memilih "reduced motion".
+  const ctaButtonVariants = {
+    rest: { scale: 1, boxShadow: "0 1px 2px rgba(15, 23, 42, 0.06)" },
+    hover: shouldReduceMotion
+      ? { scale: 1, boxShadow: "0 1px 2px rgba(15, 23, 42, 0.06)" }
+      : {
+          scale: 1.015,
+          boxShadow: "0 14px 28px -10px rgba(15, 23, 42, 0.35)",
+          transition: { duration: 0.35, ease: organicEase },
+        },
+  };
+
+  // Sapuan "shine" tipis yang lewat di atas tombol saat hover — murni polish visual,
+  // one-shot per hover (bukan loop ambient), jadi tidak butuh gate reduced-motion tambahan
+  // selain menonaktifkannya total saat reduced motion aktif.
+  const ctaShineVariants = {
+    rest: { x: "-120%" },
+    hover: shouldReduceMotion
+      ? { x: "-120%" }
+      : { x: "120%", transition: { duration: 0.65, ease: organicEase } },
   };
 
   return (
@@ -358,7 +433,16 @@ export default function Header() {
         )}
       </AnimatePresence>
 
-      {/* Cart Drawer Panel (AnimatePresence) */}
+      {/*
+        Panel Cart & Checkout (Disatukan)
+        ---------------------------------
+        Satu drawer yang sama menampilkan dua "tampilan": daftar keranjang
+        (cart view) dan formulir data pengiriman (checkout view). Peralihan
+        antar tampilan dilakukan lewat AnimatePresence mode="wait" di dalam
+        panel yang tetap sama, bukan modal terpisah di atasnya. `isCartOpen`
+        mengontrol buka/tutup panel; `isCheckoutOpen` mengontrol tampilan mana
+        yang aktif di dalamnya.
+      */}
       <AnimatePresence>
         {isCartOpen && (
           <>
@@ -367,274 +451,312 @@ export default function Header() {
               initial={{ opacity: 0 }}
               animate={{ opacity: 0.5 }}
               exit={{ opacity: 0 }}
-              onClick={() => setIsCartOpen(false)}
+              onClick={closeCartEntirely}
               className="fixed inset-0 z-50 bg-black/55"
             />
             
-            {/* Cart Drawer */}
+            {/* Panel (Sliding Drawer) */}
             <motion.div
               initial={{ x: "100%" }}
               animate={{ x: 0 }}
               exit={{ x: "100%" }}
               transition={{ type: "spring", damping: 25, stiffness: 200 }}
-              className="fixed inset-y-0 right-0 z-50 w-full max-w-md bg-white shadow-2xl flex flex-col justify-between"
+              className="fixed inset-y-0 right-0 z-50 w-full max-w-md bg-white shadow-2xl overflow-hidden flex flex-col"
             >
-              {/* Header */}
-              <div className="px-6 py-5 border-b border-border-custom flex items-center justify-between bg-surface/50">
-                <div className="flex items-center gap-2">
-                  <ShoppingBag className="h-5 w-5 text-primary" />
-                  <span className="font-sans text-base font-bold text-primary">Keranjang Belanja</span>
-                  <span className="bg-primary text-white text-[10px] font-mono px-2 py-0.5 rounded-full font-bold">
-                    {cartCount}
-                  </span>
-                </div>
-                <button
-                  onClick={() => setIsCartOpen(false)}
-                  className="p-1 rounded-full text-text-secondary hover:text-primary hover:bg-surface transition-colors"
-                >
-                  <X className="h-6 w-6" />
-                </button>
-              </div>
-
-              {/* Items List */}
-              <div className="flex-1 overflow-y-auto p-6 space-y-4">
-                {items.length === 0 ? (
-                  <div className="flex flex-col items-center justify-center h-full text-center space-y-4">
-                    <div className="h-16 w-16 bg-surface rounded-full flex items-center justify-center text-text-muted">
-                      <ShoppingBag className="h-8 w-8" />
-                    </div>
-                    <div>
-                      <h3 className="font-sans text-base font-bold text-primary">Keranjang Kosong</h3>
-                      <p className="text-text-secondary text-xs mt-1.5 max-w-[240px]">
-                        Belum ada klakat atau alat dapur premium yang ditambahkan ke keranjang belanja Anda.
-                      </p>
-                    </div>
-                    <Link
-                      href="/catalog"
-                      onClick={() => setIsCartOpen(false)}
-                      className="inline-flex items-center gap-2 px-5 py-2.5 bg-primary text-white text-xs font-semibold rounded-md hover:bg-primary-hover transition-colors"
-                    >
-                      Jelajahi Produk
-                      <ArrowRight className="h-3.5 w-3.5" />
-                    </Link>
-                  </div>
-                ) : (
-                  items.map((item) => {
-                    const price = item.variant?.price_override !== null && item.variant?.price_override !== undefined
-                      ? item.variant.price_override
-                      : item.product.price;
-                    
-                    return (
-                      <div
-                        key={item.id}
-                        className="flex items-start gap-4 p-3 border border-border-custom rounded-lg hover:border-border-strong transition-all relative group"
+              <AnimatePresence mode="wait" initial={false}>
+                {!isCheckoutOpen ? (
+                  /* ============ CART VIEW ============ */
+                  <motion.div
+                    key="cart-view"
+                    variants={panelViewVariants}
+                    initial="enter"
+                    animate="center"
+                    exit="exit"
+                    className="flex flex-col h-full"
+                  >
+                    {/* Header */}
+                    <div className="px-6 py-5 border-b border-border-custom flex items-center justify-between bg-surface/50">
+                      <div className="flex items-center gap-2">
+                        <ShoppingBag className="h-5 w-5 text-primary" />
+                        <span className="font-sans text-base font-bold text-primary">Keranjang Belanja</span>
+                        <span className="bg-primary text-white text-[10px] font-mono px-2 py-0.5 rounded-full font-bold">
+                          {cartCount}
+                        </span>
+                      </div>
+                      <button
+                        ref={cartCloseButtonRef}
+                        onClick={closeCartEntirely}
+                        className="p-1 rounded-full text-text-secondary hover:text-primary hover:bg-surface transition-colors"
+                        aria-label="Tutup Keranjang"
                       >
-                        {/* Image Placeholder with Grey Layer */}
-                        <div className="relative h-16 w-16 overflow-hidden rounded-md bg-surface border border-border-custom flex-shrink-0">
-                          {item.product.image_url ? (
-                            <img
-                              src={item.product.image_url}
-                              alt={item.product.name}
-                              className="h-full w-full object-cover"
-                            />
-                          ) : (
-                            <div className="h-full w-full bg-neutral-200" />
-                          )}
-                        </div>
+                        <X className="h-6 w-6" />
+                      </button>
+                    </div>
 
-                        {/* Details */}
-                        <div className="flex-1 min-w-0 pr-6">
-                          <h4 className="font-sans text-xs font-bold text-primary line-clamp-1">
-                            {item.product.name}
-                          </h4>
-                          {item.variant && (
-                            <span className="inline-block mt-1 text-[10px] font-medium text-text-secondary bg-surface px-1.5 py-0.5 rounded border border-border-custom">
-                              Ukuran: {item.variant.size_label}
-                            </span>
-                          )}
-                          <div className="mt-2 flex items-center justify-between">
-                            {/* Quantity Editor */}
-                            <div className="flex items-center border border-border-strong rounded bg-surface">
+                    {/* Items List */}
+                    <div className="flex-1 overflow-y-auto p-6 space-y-4">
+                      {items.length === 0 ? (
+                        <div className="flex flex-col items-center justify-center h-full text-center space-y-4">
+                          <div className="h-16 w-16 bg-surface rounded-full flex items-center justify-center text-text-muted">
+                            <ShoppingBag className="h-8 w-8" />
+                          </div>
+                          <div>
+                            <h3 className="font-sans text-base font-bold text-primary">Keranjang Kosong</h3>
+                            <p className="text-text-secondary text-xs mt-1.5 max-w-[240px]">
+                              Belum ada klakat atau alat dapur premium yang ditambahkan ke keranjang belanja Anda.
+                            </p>
+                          </div>
+                          <Link
+                            href="/catalog"
+                            onClick={closeCartEntirely}
+                            className="inline-flex items-center gap-2 px-5 py-2.5 bg-primary text-white text-xs font-semibold rounded-md hover:bg-primary-hover transition-colors"
+                          >
+                            Jelajahi Produk
+                            <ArrowRight className="h-3.5 w-3.5" />
+                          </Link>
+                        </div>
+                      ) : (
+                        items.map((item) => {
+                          const price = item.variant?.price_override !== null && item.variant?.price_override !== undefined
+                            ? item.variant.price_override
+                            : item.product.price;
+                          
+                          return (
+                            <div
+                              key={item.id}
+                              className="flex items-start gap-4 p-3 border border-border-custom rounded-lg hover:border-border-strong transition-all relative group"
+                            >
+                              {/* Image Placeholder with Grey Layer */}
+                              <div className="relative h-16 w-16 overflow-hidden rounded-md bg-surface border border-border-custom flex-shrink-0">
+                                {item.product.image_url ? (
+                                  <img
+                                    src={item.product.image_url}
+                                    alt={item.product.name}
+                                    className="h-full w-full object-cover"
+                                  />
+                                ) : (
+                                  <div className="h-full w-full bg-neutral-200" />
+                                )}
+                              </div>
+
+                              {/* Details */}
+                              <div className="flex-1 min-w-0 pr-6">
+                                <h4 className="font-sans text-xs font-bold text-primary line-clamp-1">
+                                  {item.product.name}
+                                </h4>
+                                {item.variant && (
+                                  <span className="inline-block mt-1 text-[10px] font-medium text-text-secondary bg-surface px-1.5 py-0.5 rounded border border-border-custom">
+                                    Ukuran: {item.variant.size_label}
+                                  </span>
+                                )}
+                                <div className="mt-2 flex items-center justify-between">
+                                  {/* Quantity Editor */}
+                                  <div className="flex items-center border border-border-strong rounded bg-surface">
+                                    <button
+                                      onClick={() => updateQuantity(item.id, item.quantity - 1)}
+                                      className="px-1.5 py-1 text-text-secondary hover:text-primary transition-colors"
+                                      aria-label="Kurangi jumlah"
+                                    >
+                                      <Minus className="h-3 w-3" />
+                                    </button>
+                                    <span className="px-2 text-xs font-mono font-semibold text-primary">
+                                      {item.quantity}
+                                    </span>
+                                    <button
+                                      onClick={() => updateQuantity(item.id, item.quantity + 1)}
+                                      className="px-1.5 py-1 text-text-secondary hover:text-primary transition-colors"
+                                      aria-label="Tambah jumlah"
+                                    >
+                                      <Plus className="h-3 w-3" />
+                                    </button>
+                                  </div>
+                                  {/* Price */}
+                                  <span className="font-mono text-xs font-bold text-primary font-tabular">
+                                    {formatIDR(price * item.quantity)}
+                                  </span>
+                                </div>
+                              </div>
+
+                              {/* Remove item button */}
                               <button
-                                onClick={() => updateQuantity(item.id, item.quantity - 1)}
-                                className="px-1.5 py-1 text-text-secondary hover:text-primary transition-colors"
+                                onClick={() => removeFromCart(item.id)}
+                                className="absolute top-3 right-3 text-text-muted hover:text-red-500 p-1 rounded hover:bg-red-50 transition-colors"
+                                aria-label="Hapus Item"
                               >
-                                <Minus className="h-3 w-3" />
-                              </button>
-                              <span className="px-2 text-xs font-mono font-semibold text-primary">
-                                {item.quantity}
-                              </span>
-                              <button
-                                onClick={() => updateQuantity(item.id, item.quantity + 1)}
-                                className="px-1.5 py-1 text-text-secondary hover:text-primary transition-colors"
-                              >
-                                <Plus className="h-3 w-3" />
+                                <Trash2 className="h-4 w-4" />
                               </button>
                             </div>
-                            {/* Price */}
-                            <span className="font-mono text-xs font-bold text-primary font-tabular">
-                              {formatIDR(price * item.quantity)}
-                            </span>
-                          </div>
+                          );
+                        })
+                      )}
+                    </div>
+
+                    {/* Footer and checkout summary */}
+                    {items.length > 0 && (
+                      <div className="p-6 border-t border-border-custom bg-surface/40 space-y-4">
+                        <div className="flex items-center justify-between text-sm">
+                          <span className="text-text-secondary font-medium">Subtotal Belanja:</span>
+                          <span className="font-mono text-base font-extrabold text-primary font-tabular">
+                            {formatIDR(cartTotal)}
+                          </span>
+                        </div>
+                        <p className="text-text-secondary text-[11px] leading-relaxed">
+                          *Pemesanan diproses manual via WhatsApp. Total di atas belum termasuk ongkos kirim. Ongkos kirim disepakati dengan admin saat konfirmasi.
+                        </p>
+                        
+                        {/* Checkout CTA WhatsApp (WhatsApp Green - NEVER change this color) */}
+                        <motion.button
+                          onClick={() => setIsCheckoutOpen(true)}
+                          variants={ctaButtonVariants}
+                          initial="rest"
+                          animate="rest"
+                          whileHover="hover"
+                          whileTap={{ scale: 0.97 }}
+                          className="relative w-full overflow-hidden py-3.5 bg-accent hover:bg-accent-hover text-white text-sm font-bold rounded-lg flex items-center justify-center gap-2 focus:ring-4 focus:ring-accent/30 cursor-pointer"
+                        >
+                          <motion.span
+                            variants={ctaShineVariants}
+                            aria-hidden="true"
+                            className="pointer-events-none absolute inset-y-0 left-0 w-1/3 -skew-x-12 bg-gradient-to-r from-white/0 via-white/25 to-white/0"
+                          />
+                          <span className="relative z-10 flex items-center gap-2">
+                            Lanjut Isi Data Pengiriman
+                            <ArrowRight className="h-4 w-4" />
+                          </span>
+                        </motion.button>
+                      </div>
+                    )}
+                  </motion.div>
+                ) : (
+                  /* ============ CHECKOUT VIEW ============ */
+                  <motion.div
+                    key="checkout-view"
+                    variants={panelViewVariants}
+                    initial="enter"
+                    animate="center"
+                    exit="exit"
+                    className="flex flex-col h-full"
+                  >
+                    {/* Header */}
+                    <div className="px-6 py-5 border-b border-border-custom flex items-center gap-3 bg-surface/50">
+                      <button
+                        onClick={() => setIsCheckoutOpen(false)}
+                        className="p-1.5 -ml-1.5 rounded-full text-text-secondary hover:text-primary hover:bg-surface transition-colors"
+                        aria-label="Kembali ke Keranjang"
+                      >
+                        <ArrowLeft className="h-5 w-5" />
+                      </button>
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center gap-1.5 text-accent">
+                          <Sparkles className="h-3.5 w-3.5" />
+                          <span className="text-[10px] font-mono font-bold tracking-wider uppercase">Konfirmasi Pemesanan</span>
+                        </div>
+                        <span className="font-sans text-sm font-bold text-primary">Data Pengiriman</span>
+                      </div>
+                      <button
+                        onClick={closeCartEntirely}
+                        className="p-1 rounded-full text-text-secondary hover:text-primary hover:bg-surface transition-colors"
+                        aria-label="Tutup Keranjang"
+                      >
+                        <X className="h-6 w-6" />
+                      </button>
+                    </div>
+
+                    {/* Form (scrollable body, same single panel) */}
+                    <div className="flex-1 overflow-y-auto p-6">
+                      <p className="text-text-secondary text-xs mb-5 leading-relaxed">
+                        Data berikut diperlukan oleh admin BalenpopStore untuk mengonfirmasi rincian ongkos kirim dan pengemasan pesanan Anda.
+                      </p>
+
+                      <form onSubmit={handleCheckoutSubmit} className="space-y-4">
+                        <div>
+                          <label className="block text-xs font-semibold text-text-secondary mb-1 flex items-center gap-1.5">
+                            <User className="h-3.5 w-3.5" />
+                            Nama Lengkap Anda *
+                          </label>
+                          <input
+                            ref={customerNameInputRef}
+                            type="text"
+                            required
+                            value={customerName}
+                            onChange={(e) => setCustomerName(e.target.value)}
+                            placeholder="e.g. Ibu Aminah / Pak Budi"
+                            className="w-full px-3.5 py-2.5 bg-white border border-border-strong rounded-md text-sm text-primary placeholder:text-text-muted focus:border-primary focus:ring-3 focus:ring-primary/10 outline-none transition-all"
+                          />
                         </div>
 
-                        {/* Remove item button */}
-                        <button
-                          onClick={() => removeFromCart(item.id)}
-                          className="absolute top-3 right-3 text-text-muted hover:text-red-500 p-1 rounded hover:bg-red-50 transition-colors"
-                          aria-label="Hapus Item"
-                        >
-                          <Trash2 className="h-4 w-4" />
-                        </button>
-                      </div>
-                    );
-                  })
-                )}
-              </div>
+                        <div>
+                          <label className="block text-xs font-semibold text-text-secondary mb-1 flex items-center gap-1.5">
+                            <Phone className="h-3.5 w-3.5" />
+                            No. WhatsApp Aktif *
+                          </label>
+                          <input
+                            type="tel"
+                            required
+                            value={customerPhone}
+                            onChange={(e) => setCustomerPhone(e.target.value)}
+                            placeholder="e.g. 0812XXXXXXXX"
+                            className="w-full px-3.5 py-2.5 bg-white border border-border-strong rounded-md text-sm text-primary placeholder:text-text-muted focus:border-primary focus:ring-3 focus:ring-primary/10 outline-none transition-all"
+                          />
+                        </div>
 
-              {/* Footer and checkout summary */}
-              {items.length > 0 && (
-                <div className="p-6 border-t border-border-custom bg-surface/40 space-y-4">
-                  <div className="flex items-center justify-between text-sm">
-                    <span className="text-text-secondary font-medium">Subtotal Belanja:</span>
-                    <span className="font-mono text-base font-extrabold text-primary font-tabular">
-                      {formatIDR(cartTotal)}
-                    </span>
-                  </div>
-                  <p className="text-text-secondary text-[11px] leading-relaxed">
-                    *Pemesanan diproses manual via WhatsApp. Total di atas belum termasuk ongkos kirim. Ongkos kirim disepakati dengan admin saat konfirmasi.
-                  </p>
-                  
-                  {/* Checkout CTA WhatsApp (WhatsApp Green - NEVER change this color) */}
-                  <button
-                    onClick={() => setIsCheckoutOpen(true)}
-                    className="w-full py-3.5 bg-accent hover:bg-accent-hover text-white text-sm font-bold rounded-lg flex items-center justify-center gap-2 shadow-sm transition-all focus:ring-4 focus:ring-accent/30 cursor-pointer"
-                  >
-                    Lanjut Isi Data Pengiriman
-                    <ArrowRight className="h-4 w-4" />
-                  </button>
-                </div>
-              )}
+                        <div>
+                          <label className="block text-xs font-semibold text-text-secondary mb-1 flex items-center gap-1.5">
+                            <MapPin className="h-3.5 w-3.5" />
+                            Alamat Pengiriman Lengkap *
+                          </label>
+                          <textarea
+                            required
+                            rows={3}
+                            value={customerAddress}
+                            onChange={(e) => setCustomerAddress(e.target.value)}
+                            placeholder="e.g. Perumahan Indah Permai Blok B2 No. 5, RT 03 RW 05, Kec. Citeureup, Bogor"
+                            className="w-full px-3.5 py-2.5 bg-white border border-border-strong rounded-md text-sm text-primary placeholder:text-text-muted focus:border-primary focus:ring-3 focus:ring-primary/10 outline-none transition-all resize-none"
+                          />
+                        </div>
+
+                        {/* Summary amount */}
+                        <div className="bg-surface/60 rounded-lg p-4 border border-border-custom flex justify-between items-center text-sm">
+                          <span className="text-text-secondary font-medium">Total Pesanan:</span>
+                          <span className="font-mono text-base font-extrabold text-primary font-tabular">
+                            {formatIDR(cartTotal)}
+                          </span>
+                        </div>
+
+                        {/* Submit checkout to WA */}
+                        <motion.button
+                          type="submit"
+                          disabled={isSubmitting}
+                          variants={ctaButtonVariants}
+                          initial="rest"
+                          animate="rest"
+                          whileHover={isSubmitting ? undefined : "hover"}
+                          whileTap={isSubmitting ? undefined : { scale: 0.97 }}
+                          className="relative w-full overflow-hidden py-3.5 bg-accent hover:bg-accent-hover disabled:bg-accent/60 text-white text-sm font-bold rounded-lg flex items-center justify-center gap-2 focus:ring-4 focus:ring-accent/30 cursor-pointer"
+                        >
+                          <motion.span
+                            variants={ctaShineVariants}
+                            aria-hidden="true"
+                            className="pointer-events-none absolute inset-y-0 left-0 w-1/3 -skew-x-12 bg-gradient-to-r from-white/0 via-white/25 to-white/0"
+                          />
+                          <span className="relative z-10 flex items-center gap-2">
+                            {isSubmitting ? (
+                              <span className="inline-block h-4 w-4 animate-spin rounded-full border-2 border-white border-t-transparent" />
+                            ) : (
+                              <>
+                                Kirim Pesanan ke WhatsApp Penjual
+                                <ArrowRight className="h-4 w-4" />
+                              </>
+                            )}
+                          </span>
+                        </motion.button>
+                      </form>
+                    </div>
+                  </motion.div>
+                )}
+              </AnimatePresence>
             </motion.div>
           </>
-        )}
-      </AnimatePresence>
-
-      {/* Checkout Data Form Modal (AnimatePresence) */}
-      <AnimatePresence>
-        {isCheckoutOpen && (
-          <div className="fixed inset-0 z-55 overflow-y-auto">
-            {/* Backdrop */}
-            <div 
-              onClick={() => setIsCheckoutOpen(false)}
-              className="fixed inset-0 bg-black/60 backdrop-blur-xs transition-opacity" 
-            />
-
-            {/* Modal Body Container */}
-            <div className="flex min-h-full items-center justify-center p-4">
-              <motion.div
-                initial={{ opacity: 0, scale: 0.95, y: 15 }}
-                animate={{ opacity: 1, scale: 1, y: 0 }}
-                exit={{ opacity: 0, scale: 0.95, y: 15 }}
-                transition={{ duration: 0.2 }}
-                className="relative w-full max-w-lg overflow-hidden rounded-xl bg-white p-6 shadow-2xl border border-border-custom"
-              >
-                {/* Close Button */}
-                <button
-                  onClick={() => setIsCheckoutOpen(false)}
-                  className="absolute top-4 right-4 p-1 rounded-full text-text-secondary hover:bg-surface hover:text-primary transition-colors"
-                >
-                  <X className="h-6 w-6" />
-                </button>
-
-                {/* Header */}
-                <div className="mb-6">
-                  <div className="flex items-center gap-2 text-accent mb-1.5">
-                    <span className="bg-accent/10 p-1.5 rounded-full">
-                      <Sparkles className="h-4 w-4" />
-                    </span>
-                    <span className="text-xs font-mono font-bold tracking-wider uppercase">Konfirmasi Pemesanan</span>
-                  </div>
-                  <h3 className="font-sans text-xl font-bold text-primary">Data Pengiriman Customer</h3>
-                  <p className="text-text-secondary text-xs mt-1 leading-relaxed">
-                    Data berikut diperlukan oleh admin BalenpopStore untuk mengonfirmasi rincian ongkos kirim dan pengemasan pesanan Anda.
-                  </p>
-                </div>
-
-                {/* Form */}
-                <form onSubmit={handleCheckoutSubmit} className="space-y-4">
-                  <div>
-                    <label className="block text-xs font-semibold text-text-secondary mb-1 flex items-center gap-1.5">
-                      <User className="h-3.5 w-3.5" />
-                      Nama Lengkap Anda *
-                    </label>
-                    <input
-                      type="text"
-                      required
-                      value={customerName}
-                      onChange={(e) => setCustomerName(e.target.value)}
-                      placeholder="e.g. Ibu Aminah / Pak Budi"
-                      className="w-full px-3.5 py-2.5 bg-white border border-border-strong rounded-md text-sm text-primary placeholder:text-text-muted focus:border-primary focus:ring-3 focus:ring-primary/10 outline-none transition-all"
-                    />
-                  </div>
-
-                  <div>
-                    <label className="block text-xs font-semibold text-text-secondary mb-1 flex items-center gap-1.5">
-                      <Phone className="h-3.5 w-3.5" />
-                      No. WhatsApp Aktif *
-                    </label>
-                    <input
-                      type="tel"
-                      required
-                      value={customerPhone}
-                      onChange={(e) => setCustomerPhone(e.target.value)}
-                      placeholder="e.g. 0812XXXXXXXX"
-                      className="w-full px-3.5 py-2.5 bg-white border border-border-strong rounded-md text-sm text-primary placeholder:text-text-muted focus:border-primary focus:ring-3 focus:ring-primary/10 outline-none transition-all"
-                    />
-                  </div>
-
-                  <div>
-                    <label className="block text-xs font-semibold text-text-secondary mb-1 flex items-center gap-1.5">
-                      <MapPin className="h-3.5 w-3.5" />
-                      Alamat Pengiriman Lengkap *
-                    </label>
-                    <textarea
-                      required
-                      rows={3}
-                      value={customerAddress}
-                      onChange={(e) => setCustomerAddress(e.target.value)}
-                      placeholder="e.g. Perumahan Indah Permai Blok B2 No. 5, RT 03 RW 05, Kec. Citeureup, Bogor"
-                      className="w-full px-3.5 py-2.5 bg-white border border-border-strong rounded-md text-sm text-primary placeholder:text-text-muted focus:border-primary focus:ring-3 focus:ring-primary/10 outline-none transition-all resize-none"
-                    />
-                  </div>
-
-                  {/* Summary amount */}
-                  <div className="bg-surface/60 rounded-lg p-4 border border-border-custom flex justify-between items-center text-sm">
-                    <span className="text-text-secondary font-medium">Total Pesanan:</span>
-                    <span className="font-mono text-base font-extrabold text-primary font-tabular">
-                      {formatIDR(cartTotal)}
-                    </span>
-                  </div>
-
-                  {/* Submit checkout to WA */}
-                  <button
-                    type="submit"
-                    disabled={isSubmitting}
-                    className="w-full py-3.5 bg-accent hover:bg-accent-hover disabled:bg-accent/60 text-white text-sm font-bold rounded-lg flex items-center justify-center gap-2 shadow-sm transition-all focus:ring-4 focus:ring-accent/30 cursor-pointer"
-                  >
-                    {isSubmitting ? (
-                      <span className="inline-block h-4 w-4 animate-spin rounded-full border-2 border-white border-t-transparent" />
-                    ) : (
-                      <>
-                        Kirim Pesanan ke WhatsApp Penjual
-                        <ArrowRight className="h-4 w-4" />
-                      </>
-                    )}
-                  </button>
-                </form>
-              </motion.div>
-            </div>
-          </div>
         )}
       </AnimatePresence>
     </>
