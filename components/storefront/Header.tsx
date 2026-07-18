@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useCart } from "@/hooks/use-cart";
@@ -18,7 +18,67 @@ import {
   Sparkles
 } from "lucide-react";
 import { cn } from "@/lib/utils";
-import { AnimatePresence, motion } from "motion/react";
+import { AnimatePresence, motion, useMotionValue, useSpring } from "motion/react";
+import { toast } from "sonner";
+
+// Varian animasi stagger untuk daftar menu navigasi mobile
+const mobileNavContainerVariants = {
+  hidden: { opacity: 0 },
+  visible: {
+    opacity: 1,
+    transition: {
+      staggerChildren: 0.06,
+      delayChildren: 0.1,
+    },
+  },
+};
+
+const mobileNavItemVariants = {
+  hidden: { opacity: 0, x: 24 },
+  visible: {
+    opacity: 1,
+    x: 0,
+    transition: { duration: 0.35, ease: [0.4, 0, 0.2, 1] },
+  },
+};
+
+/**
+ * Icon ShoppingBag dengan efek "magnetic": saat kursor mendekat ke tombol,
+ * icon sedikit tertarik mengikuti arah kursor, lalu kembali ke posisi semula
+ * dengan pegas (spring) yang lembut saat kursor menjauh.
+ */
+function MagneticShoppingBagIcon({ className }: { className?: string }) {
+  const x = useMotionValue(0);
+  const y = useMotionValue(0);
+  const springX = useSpring(x, { stiffness: 150, damping: 12, mass: 0.15 });
+  const springY = useSpring(y, { stiffness: 150, damping: 12, mass: 0.15 });
+
+  const handleMouseMove = (e: React.MouseEvent<HTMLElement>) => {
+    const rect = e.currentTarget.getBoundingClientRect();
+    const relX = e.clientX - (rect.left + rect.width / 2);
+    const relY = e.clientY - (rect.top + rect.height / 2);
+    // Kekuatan tarikan magnetic dibatasi agar tetap terasa "sedikit", bukan berlebihan
+    x.set(relX * 0.35);
+    y.set(relY * 0.35);
+  };
+
+  const handleMouseLeave = () => {
+    x.set(0);
+    y.set(0);
+  };
+
+  return (
+    <span
+      onMouseMove={handleMouseMove}
+      onMouseLeave={handleMouseLeave}
+      className="inline-flex"
+    >
+      <motion.span style={{ x: springX, y: springY }} className="inline-flex">
+        <ShoppingBag className={className} />
+      </motion.span>
+    </span>
+  );
+}
 
 export default function Header() {
   const pathname = usePathname();
@@ -33,6 +93,17 @@ export default function Header() {
   const [customerPhone, setCustomerPhone] = useState("");
   const [customerAddress, setCustomerAddress] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
+
+  // Melacak penambahan item baru ke keranjang untuk memicu animasi pulse pada badge
+  const previousCartCountRef = useRef(cartCount);
+  const [badgeBumpKey, setBadgeBumpKey] = useState(0);
+
+  useEffect(() => {
+    if (cartCount > previousCartCountRef.current) {
+      setBadgeBumpKey((prev) => prev + 1);
+    }
+    previousCartCountRef.current = cartCount;
+  }, [cartCount]);
 
   const navLinks = [
     { name: "Beranda", href: "/" },
@@ -53,7 +124,9 @@ export default function Header() {
   const handleCheckoutSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (!customerName || !customerPhone || !customerAddress) {
-      alert("Harap lengkapi semua formulir!");
+      toast.error("Harap lengkapi semua formulir!", {
+        description: "Nama, No. WhatsApp, dan Alamat wajib diisi sebelum melanjutkan.",
+      });
       return;
     }
 
@@ -112,6 +185,9 @@ export default function Header() {
         setIsCheckoutOpen(false);
         setIsCartOpen(false);
         setIsSubmitting(false);
+        toast.success("Pesanan berhasil dibuat!", {
+          description: "Kamu akan diarahkan ke WhatsApp Admin untuk konfirmasi lebih lanjut.",
+        });
         window.open(waUrl, "_blank");
       })
       .catch((err) => {
@@ -121,6 +197,9 @@ export default function Header() {
         setIsCheckoutOpen(false);
         setIsCartOpen(false);
         setIsSubmitting(false);
+        toast.success("Pesanan diteruskan ke WhatsApp Admin", {
+          description: "Pencatatan otomatis sempat gagal, tapi pesananmu tetap terkirim.",
+        });
         window.open(waUrl, "_blank");
       });
   };
@@ -173,11 +252,17 @@ export default function Header() {
               className="relative p-2 text-text-secondary hover:text-primary hover:bg-surface rounded-full transition-all focus:outline-none focus:ring-2 focus:ring-accent/40"
               aria-label="Keranjang Belanja"
             >
-              <ShoppingBag className="h-6 w-6" />
+              <MagneticShoppingBagIcon className="h-6 w-6" />
               {cartCount > 0 && (
-                <span className="absolute -top-1 -right-1 flex h-5 w-5 items-center justify-center rounded-full bg-accent text-[11px] font-mono font-bold text-white shadow-sm ring-2 ring-white">
+                <motion.span
+                  key={badgeBumpKey}
+                  initial={{ scale: 1.6 }}
+                  animate={{ scale: 1 }}
+                  transition={{ type: "spring", stiffness: 400, damping: 12 }}
+                  className="absolute -top-1 -right-1 flex h-5 w-5 items-center justify-center rounded-full bg-accent text-[11px] font-mono font-bold text-white shadow-sm ring-2 ring-white"
+                >
                   {cartCount}
-                </span>
+                </motion.span>
               )}
             </button>
 
@@ -229,24 +314,30 @@ export default function Header() {
                     <X className="h-6 w-6" />
                   </button>
                 </div>
-                <div className="flex flex-col gap-5 mt-8">
+                <motion.div
+                  variants={mobileNavContainerVariants}
+                  initial="hidden"
+                  animate="visible"
+                  className="flex flex-col gap-5 mt-8"
+                >
                   {navLinks.map((link) => {
                     const isActive = pathname === link.href;
                     return (
-                      <Link
-                        key={link.href}
-                        href={link.href}
-                        onClick={() => setIsMobileMenuOpen(false)}
-                        className={cn(
-                          "text-base font-semibold py-1 transition-colors",
-                          isActive ? "text-primary border-l-4 border-primary pl-3" : "text-text-secondary pl-4"
-                        )}
-                      >
-                        {link.name}
-                      </Link>
+                      <motion.div key={link.href} variants={mobileNavItemVariants}>
+                        <Link
+                          href={link.href}
+                          onClick={() => setIsMobileMenuOpen(false)}
+                          className={cn(
+                            "text-base font-semibold py-1 transition-colors block",
+                            isActive ? "text-primary border-l-4 border-primary pl-3" : "text-text-secondary pl-4"
+                          )}
+                        >
+                          {link.name}
+                        </Link>
+                      </motion.div>
                     );
                   })}
-                </div>
+                </motion.div>
               </div>
 
               {/* Bottom Admin & Contact links inside Mobile Drawer */}
