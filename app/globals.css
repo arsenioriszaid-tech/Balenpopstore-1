@@ -23,6 +23,11 @@
   --font-sans: "Inter", system-ui, -apple-system, sans-serif;
   --font-mono: "JetBrains Mono", ui-monospace, monospace;
 
+  /* Editorial Premium: display/heading typeface — warm serif for craft & heritage character,
+     distinct from the utilitarian sans/mono pairing used for body copy & data.
+     Loaded via next/font/google in app/layout.tsx as --font-display-family. */
+  --font-display: var(--font-display-family), Georgia, serif;
+
   --radius-sm: 0.25rem;
   --radius-md: 0.5rem;
   --radius-lg: 0.75rem;
@@ -58,6 +63,36 @@
     -webkit-backdrop-filter: blur(16px) saturate(180%);
     border: 1px solid rgba(228, 228, 231, 0.5);
   }
+
+  /*
+   * Editorial Premium: tekstur grain/noise ambien.
+   * Ringan (inline SVG data-URI, tanpa request eksternal) dan sangat halus (opacity 5%)
+   * agar permukaan flat tidak terasa "steril" seperti template SaaS generik.
+   *
+   * Pemakaian sebagai overlay di atas sebuah section (section harus `position: relative`):
+   *   <div className="absolute inset-0 bg-grain pointer-events-none" />
+   * atau langsung sebagai background sebuah elemen block-level.
+   */
+  .bg-grain {
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='220' height='220'%3E%3Cfilter id='grain'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='2' stitchTiles='stitch'/%3E%3CfeColorMatrix type='matrix' values='0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0.05 0'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23grain)'/%3E%3C/svg%3E");
+    background-repeat: repeat;
+    background-size: 220px 220px;
+  }
+
+  /*
+   * Editorial Premium: mesh-gradient lembut sebagai alternatif latar flat (bg-surface/30).
+   * Menumpuk beberapa radial-gradient bernada rendah dari token warna brand yang sudah ada
+   * (primary, accent, surface) agar section terasa punya kedalaman tanpa mengorbankan
+   * keterbacaan konten di atasnya.
+   */
+  .bg-mesh-soft {
+    background-color: var(--color-surface);
+    background-image:
+      radial-gradient(at 15% 20%, color-mix(in srgb, var(--color-accent) 8%, transparent) 0px, transparent 55%),
+      radial-gradient(at 85% 15%, color-mix(in srgb, var(--color-primary) 6%, transparent) 0px, transparent 50%),
+      radial-gradient(at 50% 90%, color-mix(in srgb, var(--color-primary) 4%, transparent) 0px, transparent 60%),
+      radial-gradient(at 90% 80%, color-mix(in srgb, var(--color-accent) 5%, transparent) 0px, transparent 50%);
+  }
 }
 
 body {
@@ -83,5 +118,24 @@ body {
   textarea {
     transition-timing-function: var(--ease-organic);
     transition-duration: var(--duration-base);
+  }
+}
+
+/*
+ * Aksesibilitas: jaring pengaman global untuk prefers-reduced-motion.
+ * Komponen yang sudah memakai useReducedMotion() di sisi JS (Framer Motion) tetap
+ * berjalan sesuai logikanya masing-masing; blok ini adalah fallback CSS murni agar
+ * animasi/transisi apa pun yang lolos dari pengecekan JS (termasuk keyframes native
+ * seperti .animate-float-slow atau animate-pulse Tailwind) tetap dipangkas drastis
+ * untuk pengguna yang mengaktifkan preferensi "reduce motion" di level OS.
+ */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
   }
 }
