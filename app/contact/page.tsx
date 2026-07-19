@@ -3,6 +3,7 @@
 import React, { useState } from "react";
 import Header from "@/components/storefront/Header";
 import Footer from "@/components/storefront/Footer";
+import { motion, AnimatePresence } from "motion/react";
 import { 
   Phone, 
   MapPin, 
@@ -12,6 +13,18 @@ import {
   CheckCircle,
   Sparkles
 } from "lucide-react";
+
+// Editorial Premium: gentle fade-up reveal for the two contact panels —
+// consistent with the reveal language used across the rest of the site
+// (Brand Highlights, About's story hero, etc.) rather than an instant render.
+const panelVariants = {
+  hidden: { opacity: 0, y: 20 },
+  visible: {
+    opacity: 1,
+    y: 0,
+    transition: { duration: 0.6, ease: "easeOut" as const },
+  },
+};
 
 export default function ContactPage() {
   const [name, setName] = useState("");
@@ -49,7 +62,7 @@ export default function ContactPage() {
             <Sparkles className="h-3.5 w-3.5 text-accent" />
             Hubungi BalenpopStore
           </div>
-          <h1 className="font-sans text-3xl sm:text-4xl font-extrabold text-primary">Saran, Pertanyaan, & Pemesanan Custom</h1>
+          <h1 className="font-display text-3xl sm:text-4xl font-extrabold text-primary">Saran, Pertanyaan, & Pemesanan Custom</h1>
           <p className="text-text-secondary text-sm">
             Apakah Anda memiliki pertanyaan spesifikasi produk dapur, penawaran harga kemitraan katering, atau ingin mengajukan saran perbaikan kualitas layanan kami? Kami siap mendengar dari Anda.
           </p>
@@ -59,8 +72,14 @@ export default function ContactPage() {
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-12 items-start">
           
           {/* LEFT: Contact Coordinates Cards */}
-          <div className="lg:col-span-5 space-y-6">
-            <h2 className="font-sans text-lg font-bold text-primary">Informasi Kontak Kami</h2>
+          <motion.div
+            initial="hidden"
+            whileInView="visible"
+            viewport={{ once: true, amount: 0.3 }}
+            variants={panelVariants}
+            className="lg:col-span-5 space-y-6"
+          >
+            <h2 className="font-display text-lg font-bold text-primary">Informasi Kontak Kami</h2>
             
             <div className="space-y-4">
               {/* Address */}
@@ -117,26 +136,52 @@ export default function ContactPage() {
                 </div>
               </div>
             </div>
-          </div>
+          </motion.div>
 
           {/* RIGHT: Contact Interactive Form */}
-          <div className="lg:col-span-7 bg-white border border-border-custom p-8 rounded-2xl shadow-sm space-y-6">
-            <h2 className="font-sans text-lg font-bold text-primary">Kirimkan Pesan Langsung</h2>
+          <motion.div
+            initial="hidden"
+            whileInView="visible"
+            viewport={{ once: true, amount: 0.3 }}
+            variants={panelVariants}
+            transition={{ delay: 0.1 }}
+            className="lg:col-span-7 bg-white border border-border-custom p-8 rounded-2xl shadow-sm space-y-6"
+          >
+            <h2 className="font-display text-lg font-bold text-primary">Kirimkan Pesan Langsung</h2>
             
-            {isSent && (
-              <div className="p-4 bg-emerald-50 border border-emerald-200 text-emerald-800 rounded-xl flex items-center gap-3 text-xs leading-relaxed">
-                <CheckCircle className="h-5 w-5 text-emerald-600 flex-shrink-0" />
-                <div>
-                  <strong className="font-bold">Pesan Anda Berhasil Terkirim!</strong> Tim operasional BalenpopStore akan segera menindaklanjuti atau menghubungi Anda via email/telepon. Terima kasih.
-                </div>
-              </div>
-            )}
+            <AnimatePresence>
+              {isSent && (
+                <motion.div
+                  key="success-message"
+                  role="status"
+                  aria-live="polite"
+                  initial={{ opacity: 0, y: -8, scale: 0.97 }}
+                  animate={{ opacity: 1, y: 0, scale: 1 }}
+                  exit={{ opacity: 0, y: -8, scale: 0.97 }}
+                  transition={{ duration: 0.3, ease: [0.4, 0, 0.2, 1] }}
+                  className="p-4 bg-emerald-50 border border-emerald-200 text-emerald-800 rounded-xl flex items-center gap-3 text-xs leading-relaxed"
+                >
+                  <motion.span
+                    initial={{ scale: 0 }}
+                    animate={{ scale: 1 }}
+                    transition={{ type: "spring", stiffness: 400, damping: 15, delay: 0.1 }}
+                    className="flex-shrink-0"
+                  >
+                    <CheckCircle className="h-5 w-5 text-emerald-600" />
+                  </motion.span>
+                  <div>
+                    <strong className="font-bold">Pesan Anda Berhasil Terkirim!</strong> Tim operasional BalenpopStore akan segera menindaklanjuti atau menghubungi Anda via email/telepon. Terima kasih.
+                  </div>
+                </motion.div>
+              )}
+            </AnimatePresence>
 
             <form onSubmit={handleSubmit} className="space-y-4">
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div>
-                  <label className="block text-xs font-bold text-text-secondary uppercase tracking-wider mb-1">Nama Lengkap Anda *</label>
+                  <label htmlFor="contact-name" className="block text-xs font-bold text-text-secondary uppercase tracking-wider mb-1">Nama Lengkap Anda *</label>
                   <input
+                    id="contact-name"
                     type="text"
                     required
                     value={name}
@@ -146,8 +191,9 @@ export default function ContactPage() {
                   />
                 </div>
                 <div>
-                  <label className="block text-xs font-bold text-text-secondary uppercase tracking-wider mb-1">Alamat Email Aktif *</label>
+                  <label htmlFor="contact-email" className="block text-xs font-bold text-text-secondary uppercase tracking-wider mb-1">Alamat Email Aktif *</label>
                   <input
+                    id="contact-email"
                     type="email"
                     required
                     value={email}
@@ -159,8 +205,9 @@ export default function ContactPage() {
               </div>
 
               <div>
-                <label className="block text-xs font-bold text-text-secondary uppercase tracking-wider mb-1">Subjek Pertanyaan *</label>
+                <label htmlFor="contact-subject" className="block text-xs font-bold text-text-secondary uppercase tracking-wider mb-1">Subjek Pertanyaan *</label>
                 <input
+                  id="contact-subject"
                   type="text"
                   required
                   value={subject}
@@ -171,8 +218,9 @@ export default function ContactPage() {
               </div>
 
               <div>
-                <label className="block text-xs font-bold text-text-secondary uppercase tracking-wider mb-1">Isi Pesan Detail *</label>
+                <label htmlFor="contact-message" className="block text-xs font-bold text-text-secondary uppercase tracking-wider mb-1">Isi Pesan Detail *</label>
                 <textarea
+                  id="contact-message"
                   required
                   rows={4}
                   value={message}
@@ -182,7 +230,8 @@ export default function ContactPage() {
                 />
               </div>
 
-              <button
+              <motion.button
+                whileTap={{ scale: 0.98 }}
                 type="submit"
                 disabled={isLoading}
                 className="w-full py-3.5 bg-primary hover:bg-primary-hover disabled:bg-primary/60 text-white text-xs font-bold rounded-lg flex items-center justify-center gap-2 shadow-sm transition-all focus:ring-4 focus:ring-primary/20 cursor-pointer uppercase tracking-wider"
@@ -195,9 +244,9 @@ export default function ContactPage() {
                     Kirim Form Pesan
                   </>
                 )}
-              </button>
+              </motion.button>
             </form>
-          </div>
+          </motion.div>
 
         </div>
 
