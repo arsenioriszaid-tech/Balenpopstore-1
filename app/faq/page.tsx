@@ -3,8 +3,32 @@
 import React, { useState } from "react";
 import Header from "@/components/storefront/Header";
 import Footer from "@/components/storefront/Footer";
-import { HelpCircle, ChevronDown, ChevronUp, Sparkles } from "lucide-react";
+import { HelpCircle, ChevronDown, Sparkles } from "lucide-react";
 import { AnimatePresence, motion } from "motion/react";
+
+// Editorial Premium: staggered entrance for the FAQ list, following the same
+// container/item variant pattern already used for the mobile nav in
+// components/storefront/Header.tsx (mobileNavContainerVariants /
+// mobileNavItemVariants), so the motion language stays consistent site-wide.
+const faqContainerVariants = {
+  hidden: { opacity: 0 },
+  visible: {
+    opacity: 1,
+    transition: {
+      staggerChildren: 0.08,
+      delayChildren: 0.1,
+    },
+  },
+};
+
+const faqItemVariants = {
+  hidden: { opacity: 0, y: 16 },
+  visible: {
+    opacity: 1,
+    y: 0,
+    transition: { duration: 0.4, ease: [0.4, 0, 0.2, 1] as const },
+  },
+};
 
 export default function FAQPage() {
   const [openIndex, setOpenIndex] = useState<number | null>(0);
@@ -56,40 +80,60 @@ export default function FAQPage() {
             <Sparkles className="h-3.5 w-3.5 text-accent" />
             Tanya & Jawab Umum
           </div>
-          <h1 className="font-sans text-3xl font-extrabold text-primary">Frequently Asked Questions</h1>
+          <h1 className="font-display text-3xl font-extrabold text-primary">Frequently Asked Questions</h1>
           <p className="text-text-secondary text-sm">
             Temukan jawaban cepat atas pertanyaan umum mengenai produk klakat stainless steel premium, proses kustomisasi ukuran, dan mekanisme pemesanan via WhatsApp.
           </p>
         </div>
 
         {/* FAQs List with Smooth Motion Accordion */}
-        <div className="border border-border-custom rounded-2xl bg-white overflow-hidden divide-y divide-border-custom mt-8 shadow-xs">
+        <motion.div
+          variants={faqContainerVariants}
+          initial="hidden"
+          whileInView="visible"
+          viewport={{ once: true, amount: 0.2 }}
+          className="border border-border-custom rounded-2xl bg-white overflow-hidden divide-y divide-border-custom mt-8 shadow-xs"
+        >
           {faqs.map((faq, index) => {
             const isOpen = openIndex === index;
+            const panelId = `faq-panel-${index}`;
+            const buttonId = `faq-trigger-${index}`;
             return (
-              <div key={index} className="transition-colors hover:bg-surface/10">
+              <motion.div
+                key={index}
+                variants={faqItemVariants}
+                className="transition-colors duration-300 ease-[cubic-bezier(0.4,0,0.2,1)] hover:bg-surface/10"
+              >
                 <button
+                  id={buttonId}
                   onClick={() => toggleFAQ(index)}
+                  aria-expanded={isOpen}
+                  aria-controls={panelId}
                   className="w-full text-left px-6 py-5 flex items-center justify-between gap-4 focus:outline-none"
                 >
                   <span className="font-sans text-sm font-bold text-primary flex items-center gap-2.5">
                     <HelpCircle className="h-4.5 w-4.5 text-accent flex-shrink-0" />
                     {faq.q}
                   </span>
-                  {isOpen ? (
-                    <ChevronUp className="h-4 w-4 text-text-secondary" />
-                  ) : (
+                  <motion.span
+                    animate={{ rotate: isOpen ? 180 : 0 }}
+                    transition={{ duration: 0.3, ease: [0.4, 0, 0.2, 1] }}
+                    className="flex-shrink-0"
+                  >
                     <ChevronDown className="h-4 w-4 text-text-secondary" />
-                  )}
+                  </motion.span>
                 </button>
                 
                 <AnimatePresence initial={false}>
                   {isOpen && (
                     <motion.div
+                      id={panelId}
+                      role="region"
+                      aria-labelledby={buttonId}
                       initial={{ height: 0, opacity: 0 }}
                       animate={{ height: "auto", opacity: 1 }}
                       exit={{ height: 0, opacity: 0 }}
-                      transition={{ duration: 0.2 }}
+                      transition={{ duration: 0.3, ease: [0.4, 0, 0.2, 1] }}
                       className="overflow-hidden bg-surface/30"
                     >
                       <p className="px-6 pb-6 text-text-secondary text-xs leading-relaxed border-t border-dashed border-border-custom pt-4">
@@ -98,10 +142,10 @@ export default function FAQPage() {
                     </motion.div>
                   )}
                 </AnimatePresence>
-              </div>
+              </motion.div>
             );
           })}
-        </div>
+        </motion.div>
 
         {/* Bottom Call to action if they still have questions */}
         <div className="bg-surface/40 rounded-xl p-6 border border-border-custom text-center space-y-3 mt-10">
